@@ -4,7 +4,7 @@ My apps 'n libs for Minecraft OpenComputers mod
 Most of the scripts are written in [moonscript](http://moonscript.org) thus generated lua code might be huge and you need higher memory or maybe higher callBudgets!
 
 ----
-libsui: An OO GUI library
+libsui: An OO GUI library (I've broke it! So don't use it yet!)
 
 suitest: test script for shrewdui
 
