@@ -101,9 +101,8 @@ Util.checkNotExceedScrBounds = function(x, y, trueVals, wrap)
   end
   return x, y, mw, mh
 end
-Util.intersect = function(self, x, y, w, h, ix, iy)
-  print(tostring(x), tostring(y), tostring(w), tostring(h), tostring(ix), tostring(iy))
-  if ix >= x and ix < x + w and iy >= y and iy < y + h then
+Util.intersect = function(self, x, y, w, h, ix, Y)
+  if ix >= x and ix < x + w and Y >= y and Y < y + h then
     return true
   end
   return false
@@ -191,9 +190,6 @@ GFX.plot = function(x, y, char)
     char = ' '
   end
   char = Util.checkUnicodeChar(char)
-  if tonumber(char) then
-    char = tonumber(char)
-  end
   return ocgpu.set(x, y, char, false)
 end
 GFX.drawStaticLine = function(x, y, len, isVertical, fillChar)
@@ -674,26 +670,25 @@ do
       end
       return false
     end,
+    intersect = function(self, x, y)
+      if x >= self.props.x and x < self.props.x + self.props.w and y >= self.props.y and y < self.props.y + self.props.h then
+        return true
+      end
+      return false
+    end,
     add = function(self, component)
       table.insert(self.children, component)
       component:parent(self)
       component.props.zorder = self.props.zindex
       self.props.zindex = self.props.zindex + 1
       for i, c in ipairs(self.children) do
-        if c.props.focusable and (function()
-          local _base_1 = c
-          local _fn_0 = _base_1.focused
-          return function(...)
-            return _fn_0(_base_1, ...)
-          end
-        end)() then
+        if c.props.focusable and c:focused() then
           c:focused(false)
         end
       end
       if component.props.focusable then
-        component:focused(true)
+        return component:focused(true)
       end
-      return self:sortChildren()
     end,
     remove = function(self, component)
       self:sortChildren()
@@ -702,25 +697,19 @@ do
           table.remove(self.children, component.props.zorder + 1)
           component.props.zorder = 0
           self.props.zindex = self.props.zindex - 1
-          if component.props.focusable then
+          if component:focused() then
             component:focused(false)
           end
           self:sortChildren()
           if self.props.zindex > 0 then
-            self.children[self.props.zindex]:focused(true)
+            self:focuseFirstFocusableChild(self.props.zindex)
           end
           break
         end
       end
     end,
-    intersect = function(self, x, y)
-      if x >= self.props.x and x < self.props.x + self.props.w and y >= self.props.y and y < self.props.y + self.props.h then
-        return true
-      end
-      return false
-    end,
     bringToFront = function(self)
-      self:sortChildren()
+      self:parent():sortChildren()
       local parentChilds = self:parent().children
       local bringOne = self.props.zorder
       local oldOne = self.props.zorder
@@ -733,11 +722,11 @@ do
       end
       self.props.zorder = bringOne
       bringElement.props.zorder = oldOne
-      self:focused(true)
-      return self:sortChildren()
+      self:parent():focuseFirstFocusableChild(bringOne)
+      return self:parent():sortChildren()
     end,
     sendToBack = function(self)
-      self:sortChildren()
+      self:parent():sortChildren()
       local parentChilds = self:parent().children
       local bringOne = self.props.zorder
       local willMove = { }
@@ -749,12 +738,15 @@ do
       for _, w in ipairs(willMove) do
         w.props.zorder = w.props.zorder + 1
       end
-      willMove[1]:focused(true)
+      focuseFirstFocusableChild(willMove[1].props.zorder)
       self.props.zorder = 0
-      return self:sortChildren()
+      return self:parent():sortChildren()
     end,
-    firstFocusableChild = function(self)
-      for i = #self.children, 1, -1 do
+    focuseFirstFocusableChild = function(self, startingZIndex)
+      if not (startingZIndex) then
+        startingZIndex = #self.children
+      end
+      for i = startingZIndex, 1, -1 do
         if self.children[i].props.focusable and not self.children[i]:focused() then
           return self.children[i]
         end
@@ -811,7 +803,6 @@ do
         forceReceiveEvent = false
       }
       self.children = { }
-      self.eventListeners = { }
       compcounter = compcounter + 1
       return self:style(UI.DefaultStyle)
     end,

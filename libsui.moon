@@ -13,6 +13,9 @@
 --      closing a window which is not focused, will freeze the wm. I think its because focusedC will be set to nil (nothing is focused and never will be focused!)
 --      wm will bring the windows with odd zorders to front (while adding new ones) so odd zindex will be brought to front
 
+-- NOTE:
+--      Everything is fucked up. Rewrite needed. WindowManager shouldn't exist ...
+
 
 ------------------------------------------------------
 -- Namespaces
@@ -34,9 +37,10 @@ json = require'json'
 ------------------------------------------------------
 -- GVars!
 local ocgpu
-compcounter = 0
+compcounter = 0 --component counter. used for assigning IDs to components
 ------------------------------------------------------
 -- Utility functions
+-- copies a table (recursive or not) and returns the copied table
 Util.tblcpy = (tab, recursive) ->
     shallowcopy = (orig) ->
         orig_type = type orig
@@ -65,6 +69,7 @@ Util.tblcpy = (tab, recursive) ->
 -- Returns true if given values exceed max resolution
 -- If trueVals, it will return valid x,y values
 -- If wrap, if x>maxResX then x=1 and y+=1 | if y>maxResY then y=maxResY and x=1
+-- THIS ONE IS NOT USED. DUNNO WHY I'VE WRITTEN THIS!
 Util.checkNotExceedScrBounds = (x=1, y=1, trueVals=false, wrap=false) ->
     mw, mh = UI.WindowManager\size!
     if trueVals
@@ -85,12 +90,14 @@ Util.checkNotExceedScrBounds = (x=1, y=1, trueVals=false, wrap=false) ->
     x, y, mw, mh
 ------------------------------------------------------
 -- Checks if given positions are inside given coordinates
-Util.intersect = (x, y, w, h, ix, iy) =>
-    print tostring(x),tostring(y),tostring(w),tostring(h),tostring(ix),tostring(iy)
-    return true if ix >= x and ix < x + w and iy >= y and iy < y + h
+-- putting iy instead of Y causes iy be nil :/ ftw
+Util.intersect = (x, y, w, h, ix, Y) =>
+    return true if ix >= x and ix < x + w and Y >= y and Y < y + h
     false
 ------------------------------------------------------
 -- Checks if char is a unicode code or an ascii char
+-- if you pass a char to it ('D' or whatever), it returns the same thing you've passed
+-- if you pass a number or a string number, it returns its unicode char
 Util.checkUnicodeChar = (char) ->
     if type(char) == 'number'
         char = unicode.char(char)
@@ -102,6 +109,7 @@ Util.checkUnicodeChar = (char) ->
 -- Color stack for pushing and popping colors for easier color setting and restoring
 GFX.__colorStack = {}
 ------------------------------------------------------
+-- some colors!
 GFX.Colors = {
     Black: 0x000000
     Blue: 0x0000FF
@@ -114,6 +122,7 @@ GFX.Colors = {
 }
 ------------------------------------------------------
 -- Gets or sets the first color in color stack. This color should always be there
+-- first color is used to be set when theres no more colors left on stack. its white on black by default
 GFX.firstColor = (bg, fg) ->
     return GFX.__colorStack[1].bg, GFX.__colorStack[1].fg unless bg and fg
     GFX.__colorStack[1] = bg: bg, fg: fg
@@ -126,30 +135,30 @@ GFX.pushColor = (bg, fg) ->
     ocgpu.setBackground bg, false
     ocgpu.setForeground fg, false
 ------------------------------------------------------
--- Pops times colors from stack and returns them as a table:
+-- Pops 'times' colors from stack and returns them as a table:
 -- { {bg: color, fg: color}, { ... }, ... }
--- If times is bigger than size of color stack or its zero, the color stack will be cleared
+-- If 'times' is bigger than size of color stack or is zero,
+--      the color stack will be cleared and all colors will be returned as a table
 GFX.popColor = (times=1) ->
     poppedColors = {}
-    cslen=->#GFX.__colorStack
-    times = cslen! - 1 if times >= cslen! or times == 0
+    cslen=->#GFX.__colorStack -- returns the length of the color stack
+    times = cslen! - 1 if times >= cslen! or times == 0 -- calculate maximum times that colors can be poped from stack
     for i=1, times
-        if #GFX.__colorStack > 1
+        if #GFX.__colorStack > 1 -- dunno whats this for!
             last = GFX.__colorStack[cslen!]
             oldbg, oldfg = last.bg, last.fg
-            table.remove GFX.__colorStack, cslen!
-            last = GFX.__colorStack[cslen!]
+            table.remove GFX.__colorStack, cslen! -- remove the shit
+            last = GFX.__colorStack[cslen!] -- get the last remaining color
             newbg, newfg = last.bg, last.fg
-            ocgpu.setBackground newbg, false
+            ocgpu.setBackground newbg, false -- and apply it
             ocgpu.setForeground newfg, false
-            table.insert poppedColors, {oldbg, oldfg, newbg, newfg}
-        else table.insert poppedColors, {GFX.__colorStack[1].bg, GFX.__colorStack[1].fg}
+            table.insert poppedColors, {oldbg, oldfg, newbg, newfg} -- this will be returned
+        else table.insert poppedColors, {GFX.__colorStack[1].bg, GFX.__colorStack[1].fg} -- dunno why this is here :-? find a reason for me
     poppedColors
 ------------------------------------------------------
 -- puts a unicode character at the specified position
 GFX.plot = (x, y, char=' ') ->
     char = Util.checkUnicodeChar char
-    char = tonumber char if tonumber char
     ocgpu.set x, y, char, false
 ------------------------------------------------------
 -- Draws a horizontal or vertical line (performs faster than drawLine)
@@ -183,16 +192,16 @@ GFX.drawLine = (x0, y0, x1, y1, fillChar=' ') ->
 -- clip will trim the parts of text that are out of given height and width
 -- if fill then it will draw a box with given coordinates
 -- if hasFilledColor then it will pop a color from color stack
---      this is useful when you want a different color for the box
+--      this is useful when you want a different color for the box and another color for the text
 --      first pushed color will be used for text and second color will be applied to box
 GFX.drawText = (text, x, y, w=0, h=0, valign='center', halign='center', wrap=false, clip=false, fill=false, hasFilledColor=false, fillChar=' ') ->
     fillChar = Util.checkUnicodeChar fillChar
     if fill
         GFX.drawBox x, y, w, h, fillChar
         GFX.popColor! if hasFilledColor
-    lines = {}
+    lines = {} -- each line will be put as a index in this table
     if wrap
-        token = (s) ->
+        token = (s) -> -- tokenize
             tokens = {}
             table.insert tokens, word for word in s\gmatch '%S+'
             tokens
@@ -208,7 +217,7 @@ GFX.drawText = (text, x, y, w=0, h=0, valign='center', halign='center', wrap=fal
                 table.insert line, word
                 spaceleft -= word\len! + 1
         table.insert lines, table.concat(line, ' ')
-    -- split lines
+    -- split lines (reaching \n will put next line as a new index in lines table)
     else
         tmptext = ''
         for i = 1, text\len!
@@ -234,7 +243,7 @@ GFX.drawText = (text, x, y, w=0, h=0, valign='center', halign='center', wrap=fal
         if linesL < h
             padding = valign == 'center' and (h - linesL) / 2 or h - linesL
             table.insert lines, i, '' for i = 1, padding
-    halign_draw_text = false
+    halign_draw_text = false -- horizontal align is a bit different. it draws each line separatedly to make it nicer! if you wanna see what happens when using a single draw, just edit these lines a bit!
     if halign != 'left'
         halign_draw_text = true
         for lineN, lineT in ipairs lines
@@ -256,8 +265,8 @@ GFX.drawBox = (x, y, w, h, fillChar=' ') ->
 -- {topleft char,topcenter char,topright char,centerright char,bottomright char,bottomcenter char,bottomleft char,centerleft char}
 GFX.drawBorder = (x, y, w, h, borderSurrounding, invertTopBottomBorders=false, ignoreTopBottomBorders=false) ->
     unless borderSurrounding or type(borderSurrounding) == 'table'
-        borderSurrounding = {88,88,88,88,88,88,88,88}
-    if #borderSurrounding < 8 then for i = #borderSurrounding, 8 do table.insert borderSurrounding, 88
+        borderSurrounding = {88,88,88,88,88,88,88,88} -- default thing
+    if #borderSurrounding < 8 then for i = #borderSurrounding, 8 do table.insert borderSurrounding, 88 -- fill in the remaining space!
 
     tl,tc,tr = borderSurrounding[1], borderSurrounding[2], borderSurrounding[3]
     cl,cr = borderSurrounding[8], borderSurrounding[4]
@@ -292,6 +301,7 @@ class UI.Style
         @style = {}
         @loadStyle style
     loadStyle: (style) =>
+        -- default style thing. I should put it somewhere else!
         default_style = [[{
                 "WindowManager": {
                     "background": "$n:0x000033"
@@ -360,7 +370,7 @@ class UI.Style
                     "prgchar": "$n:9552"
                 }
             }]]
-        jsonstr = ''
+        jsonstr = '' -- this is the whole string that's gonna be passed to json decoder and also it will be returned
         if style == 'default'
             jsonstr = default_style 
         else -- If style is a file, it will read from the file else it should be a string
@@ -368,30 +378,30 @@ class UI.Style
             if ocfs.exists style
                 f = io.open style, 'r'
                 if f
-                    jsonstr = f:read '*all'
+                    jsonstr = f:read '*all' -- haven't tested this. dunno if it works on oc
                     f:close!
                     return false unless jsonstr
             elseif type(style) == 'string'
                 jsonstr = style
         if #jsonstr > 0
-            @style = json\decode jsonstr
+            @style = json\decode jsonstr -- decode the shit
             -- Parse the json table
             for c,t in pairs(@style) do if type(t) == 'table' then for p,v in pairs(t)
-                if type(v) == 'string' and v\len() > 3 and v\sub(1, 1) == '$' and v\sub(3, 3) == ':'
-                    cmd = v\sub(2, 2)
-                    tmpstr = ''
+                if type(v) == 'string' and v\len() > 3 and v\sub(1, 1) == '$' and v\sub(3, 3) == ':' -- hmm? it checks for value being a string and starts with $X:val
+                    cmd = v\sub(2, 2) -- cmd is that X in "$X:val"!
+                    tmpstr = '' -- the value
                     for i = 4, v\len()
                         if cmd == 'c' --its a character value
                             tmpstr = v\sub(i, i)
                             @style[c][p] = tmpstr
                             break
-                        elseif cmd == 's' or cmd == 'n' or cmd == 't'
+                        elseif cmd == 's' or cmd == 'n' or cmd == 't' -- its not a character value
                             tmpstr ..= v\sub(i, i)
                     @style[c][p] = tmpstr if cmd == 's' --its a string value
                     @style[c][p] = tonumber(tmpstr) if cmd == 'n' --its a number value
-                    if cmd == 't' --its table
-                        tmptbl = ocserialization.unserialize("{#{tmpstr}}")
-                        for i,v in ipairs tmptbl do if tonumber(v) then tmptbl[i] = tonumber(v)
+                    if cmd == 't' --its table (indexed table not key,value table!)
+                        tmptbl = ocserialization.unserialize("{#{tmpstr}}") -- thank you Sangar for this magically useful function!
+                        for i,v in ipairs tmptbl do if tonumber(v) then tmptbl[i] = tonumber(v) -- iterate it ...
                         @style[c][p] = tmptbl
         jsonstr
     -- Gets or sets the property in loaded style
@@ -402,28 +412,27 @@ class UI.Style
     componentStyleProp: (component, prop, val) =>
         return @style[component][prop] unless val
         @style[component][prop] = val
-    -- Gets or sets the component style
+    -- Gets or sets the component style. copies whole component style so changes wont affect the style itself
     componentStyle: (component, style) =>
         return Util.tblcpy @style[component] unless style
         @style[component] = Util.tblcpy style
 ------------------------------------------------------
--- Component base class
+-- Component base class. all other components should inherit from this class, even the custom components, else you'll fall in trouble
 class UI.Component
     new: (type, x, y, w, h, text='') =>
         @props = {
             parent: nil, weight: 1
             text: text, type: type --type: string. the name of class
-            x: x, y: y, w: w, h: h
-            cx: x, cy: y, cw: w, ch: h --constant coordinates
+            x: x, y: y, w: w, h: h -- these are used for rendering the component
+            cx: x, cy: y, cw: w, ch: h --constant coordinates used for getting the first position of component set by user or whoever else!
             zorder: 0, zindex: 0 --zorder: index in parent's children, zindex: component's children index
             style: {}, focused: false, focusable: false
             visible: true, id: compcounter
             forceReceiveEvent: false,
         }
         @children = {}
-        @eventListeners = {}
-        compcounter += 1
-        @style UI.DefaultStyle
+        compcounter += 1 -- increase the component counter!
+        @style UI.DefaultStyle -- set the default style
     prop: (prop, val) =>
         return @props[prop] unless val
         @props[prop] = val
@@ -467,32 +476,31 @@ class UI.Component
     compare: (component) =>
         return true if @props.id == component.props.id
         false
+    intersect: (x, y) =>
+        return true if x >= @props.x and x < @props.x + @props.w and y >= @props.y and y < @props.y + @props.h
+        false
     add: (component) =>
-        table.insert(@children, component)
+        table.insert @children, component
         component\parent self
         component.props.zorder = @props.zindex
         @props.zindex += 1
         -- set prev focused item to false
         for i,c in ipairs @children
-            c\focused false if c.props.focusable and c\focused
-        component\focused true if component.props.focusable 
-        @sortChildren!
+            c\focused false if c.props.focusable and c\focused!
+        component\focused true if component.props.focusable
     remove: (component) =>
         @sortChildren!
         for i,c in ipairs @children
             if component\compare c
-                table.remove @children, component.props.zorder + 1
+                table.remove @children, component.props.zorder + 1 -- remove the component at that index!
                 component.props.zorder = 0
                 @props.zindex -= 1
-                component\focused false if component.props.focusable 
-                @sortChildren!
-                @children[@props.zindex]\focused true if @props.zindex > 0
+                component\focused false if component\focused!
+                @sortChildren! -- sort'em all again
+                @focuseFirstFocusableChild(@props.zindex) if @props.zindex > 0
                 break
-    intersect: (x, y) =>
-        return true if x >= @props.x and x < @props.x + @props.w and y >= @props.y and y < @props.y + @props.h
-        false
     bringToFront: =>
-        @sortChildren!
+        @parent!\sortChildren!
         parentChilds = @parent!.children
         bringOne = @props.zorder
         oldOne = @props.zorder
@@ -503,10 +511,10 @@ class UI.Component
                 bringElement = w
         @props.zorder = bringOne
         bringElement.props.zorder = oldOne
-        @focused true
-        @sortChildren!
+        @parent!\focuseFirstFocusableChild bringOne
+        @parent!\sortChildren!
     sendToBack: =>
-        @sortChildren!
+        @parent!\sortChildren!
         parentChilds = @parent!.children
         bringOne = @props.zorder
         willMove = {}
@@ -515,12 +523,14 @@ class UI.Component
                 table.insert willMove, w
         for _,w in ipairs willMove
             w.props.zorder += 1
-        willMove[1]\focused true
+        focuseFirstFocusableChild willMove[1].props.zorder
         @props.zorder = 0
-        @sortChildren!
-    firstFocusableChild: =>
+        @parent!\sortChildren!
+    -- focuses on first focusable children
+    focuseFirstFocusableChild: (startingZIndex) =>
         -- starts from last component and finds first focusable component. returns nil if nothing was found
-        for i=#@children, 1, -1
+        startingZIndex = #@children unless startingZIndex
+        for i=startingZIndex, 1, -1
             if @children[i].props.focusable and not @children[i]\focused! then return @children[i]
         return nil
     sortChildren: =>

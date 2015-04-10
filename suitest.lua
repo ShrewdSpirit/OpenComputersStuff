@@ -10,8 +10,8 @@ local function showmem()
     print('tm/fm/um: '..tostring(t)..'/'..tostring(f)..'/'..tostring(u))
 end
 
-package.loaded.shrewdui = nil
-local sui = require('shrewdui')
+package.loaded.libsui = nil
+local sui = require('libsui')
 ui = sui.UI
 gfx = sui.GFX
 swm = ui.init()
