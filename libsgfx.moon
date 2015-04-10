@@ -77,13 +77,11 @@ GFX.Colors = monitor: GFX.MColors, m: GFX.MColors, screen: GFX.SColors, s: GFX.S
 ------------------------------------------------------
 -- Graphics driver used for detecting/working with gpus, screens and monitors
 class GFX.Driver
-    -- one time driver initialization
-    -- gets available gpus, screens, monitors and their information and returns a graphic driver
     new: =>
         @props = {
             gpu: nil -- the gpu being used
-            displays: {} -- list of display proxies
-            activeDisplay: nil -- display id
+            displays: {} -- display proxies
+            activeDisplay: nil -- current display
         }
         @flush!
     --------------------------------------
@@ -93,7 +91,7 @@ class GFX.Driver
         return nil unless occomponent.type(gpuproxy.address) == 'gpu'
         @props.gpu = gpuproxy
     --------------------------------------
-    -- sets or gets the active display of given driver
+    -- sets or gets the active display
     activeDisplay: (displayID) =>
         return @props.activeDisplay unless displayID
         if displayID >= 1 and displayID <= #@displays!
@@ -108,6 +106,7 @@ class GFX.Driver
                 if p.type == type
                     @activeDisplay i
                     return true
+        false
     --------------------------------------
     -- gets the display
     display: (displayID) => @props.displays[displayID]
@@ -115,7 +114,7 @@ class GFX.Driver
     -- returns a table of available displays (OpenComputers screens and ComputerCraft monitors)
     displays: => @props.displays
     --------------------------------------
-    -- returns active display type if displayID is nil
+    -- returns active display type
     displayType: => @activeDisplay!.type
     --------------------------------------
     -- sets or gets the resolution of active display
@@ -229,6 +228,8 @@ class GFX.Context
     driver: (driver) =>
         return @props.driver unless driver
         @props.driver = driver
+    --------------------------------------
+    -- gets or sets the first color in color stack. this color cannot be popped out of stack
     firstColor: (bg, fg) =>
         return @props.colorStack[1].bg, @props.colorStack[1].fg unless bg and fg
         @props.colorStack[1] = bg: bg, fg: fg

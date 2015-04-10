@@ -86,6 +86,7 @@ do
           end
         end
       end
+      return false
     end,
     display = function(self, displayID)
       return self.props.displays[displayID]
