@@ -20,10 +20,7 @@ Functions:
 - set: `(x: number, y: number, str: string|number, vertical: boolean)` writes a string at given position (or a single character/unicode)
 - fill: `(x: number, y: number, w: number, h: number, char: number|string)` fills a rectangle with given coordinates
 - flush: `(stat: table)`
-    flushes the displays informations
-    this should be called when a gpu,screen or monitor has been removed, added or resized
-    stat is the event (run dmesg and try adding or removing screens,monitors)
-    if stat is nil, driver will be reinitialized
+    flushes the displays informations. this should be called when a gpu,screen or monitor has been removed, added or resized. stat is the event (run dmesg and try adding or removing screens,monitors). if stat is nil, driver will be reinitialized
 - checkComponentAvailability: `()` checks if theres a gpu and an active display
 
 Context class
@@ -35,25 +32,15 @@ Functions:
 - firstColor `(background: number, foreground: number) background: number, foreground: number` gets or sets the first color in color stack. this color cannot be popped out of stack
 - pushColor `(background: number, foreground: number) background: number, foreground: number` pushes a color into color stack. use this to set the current color
 - popColor `(times=1: number) background: number, foreground: number`
-    Pops 'times' colors from stack and returns them as a table:
-    { {bg: color, fg: color}, { ... }, ... }
-    If 'times' is bigger than size of color stack or is zero, the color stack will be cleared and all colors will be returned as a table
-    used to restore the previous set color
+    Pops 'times' colors from stack and returns them as a table: { {bg: color, fg: color}, { ... }, ... }. If 'times' is bigger than size of color stack or is zero, the color stack will be cleared and all colors will be returned as a table. used to restore the previous set color
 - plot `(x: number, y: number, char=' ': number|string)` plots a character/pixel at given position
 - drawLine `(x0: number, y0: number, x1: number, y1: number, fillChar=' ': number|string)` draws a line
 - drawStaticLine `x: number, y: number, len: number, vertical=false: boolean, fillChar=' ': number|string` draws a horizontal or vertical line (faster than drawLine)
 - drawText `(text: string, x: number, y: number, w=0: number, h=0: number, valign='center': string, halign='center': string, wrap=false: boolean, clip=false: boolean, fill=false: boolean, hasFilledColor=false: boolean, fillChar=' ': string|number)`
-    Draws a text with given position and size. wrap wraps the text to new line if height > 1
-    clip will trim the parts of text that are out of given height and width
-    if fill then it will draw a box with given coordinates
-    if hasFilledColor then it will pop a color from color stack
-    this is useful when you want a different color for the box and another color for the text
-    first pushed color will be used for text and second color will be applied to box
+    Draws a text with given position and size. wrap wraps the text to new line if height > 1. clip will trim the parts of text that are out of given height and width. if fill then it will draw a box with given coordinates. if hasFilledColor then it will pop a color from color stack. this is useful when you want a different color for the box and another color for the text. first pushed color will be used for text and second color will be applied to box
 - drawBox `(x: number, y: number, w: number, h: number, fillChar=' ': string|number)` draws a box
 - drawBorder `(x: number, y: number, w: number, h: number, borderSurrounding: table, invertUpDownBorders=false: boolean, ignoreTopBottomBorders=false: boolean)`
-    draws a border!
-    borderSurrounding should be a table of these values:
-    {topleft char,topcenter char,topright char,centerright char,bottomright char,bottomcenter char,bottomleft char,centerleft char}
+    draws a border! borderSurrounding should be a table of these values: {topleft char,topcenter char,topright char,centerright char,bottomright char,bottomcenter char,bottomleft char,centerleft char}
 - clear `()` clears the display and sets cursor position to 1,1 if current display is a monitor
 
 Colors table
