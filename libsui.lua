@@ -2,7 +2,6 @@ local UI = { }
 UI.Components = { }
 local Util = { }
 local GFX = { }
-local occomp = require('component')
 local ocevent = require('event')
 local ocfs = require('filesystem')
 local ocserialization = require('serialization')
@@ -11,7 +10,6 @@ package.loaded.json = nil
 local json = require('json')
 package.loaded.libsgfx = nil
 local gfx = require('libsgfx')
-local ocgpu
 local compcounter = 0
 Util.tblcpy = function(tab, recursive)
   local shallowcopy
@@ -59,9 +57,6 @@ do
   local _base_0 = {
     loadStyle = function(self, style)
       local default_style = [[{
-                "WindowManager": {
-                    "background": "$n:0x000033"
-                },
                 "Window": {
                     "background": "$n:0x0000ff",
                     "hasborder": true,
@@ -1428,10 +1423,6 @@ do
   UI.Components.Progress = _class_0
 end
 UI.init = function(resX, resY)
-  if not (occomp.isAvailable('gpu') or occomp.isAvailable('screen')) then
-    return false
-  end
-  ocgpu = occomp.gpu
   local mrx, mry = ocgpu.maxResolution()
   local crx, cry = ocgpu.getResolution()
   if not (resX) then

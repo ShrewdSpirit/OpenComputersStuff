@@ -240,6 +240,7 @@ do
       if not (driver) then
         return self.props.driver
       end
+      assert(driver, 'Given driver is invalid')
       self.props.driver = driver
     end,
     firstColor = function(self, bg, fg)
@@ -534,7 +535,7 @@ do
       }
       self:driver(driver)
       local displayType = self:driver():displayType()
-      return self:firstColor(GFX.Colors[displayType].Red, GFX.Colors[displayType].White)
+      return self:firstColor(GFX.Colors[displayType].Black, GFX.Colors[displayType].White)
     end,
     __base = _base_0,
     __name = "Context"

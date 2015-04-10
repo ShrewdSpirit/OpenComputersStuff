@@ -25,7 +25,6 @@ Util = {} -- Utility namespace
 GFX = {} -- Graphics namespace (draw shapes, text, etc)
 ------------------------------------------------------
 -- OpenOS modules
-occomp = require'component'
 ocevent = require'event'
 ocfs = require'filesystem'
 ocserialization = require'serialization'
@@ -38,7 +37,6 @@ package.loaded.libsgfx = nil
 gfx = require'libsgfx'
 ------------------------------------------------------
 -- GVars!
-local ocgpu
 compcounter = 0 --component counter. used for assigning IDs to components
 ------------------------------------------------------
 -- Utility functions
@@ -82,9 +80,6 @@ class UI.Style
     loadStyle: (style) =>
         -- default style thing. I should put it somewhere else!
         default_style = [[{
-                "WindowManager": {
-                    "background": "$n:0x000033"
-                },
                 "Window": {
                     "background": "$n:0x0000ff",
                     "hasborder": true,
@@ -624,8 +619,6 @@ class UI.Components.Progress extends UI.Component
 ------------------------------------------------------
 -- Initialization function
 UI.init = (resX, resY) ->
-    return false unless occomp.isAvailable'gpu' or occomp.isAvailable'screen'
-    ocgpu = occomp.gpu
     --return false if ocgpu.getDepth! < 4
     mrx, mry = ocgpu.maxResolution!
     crx, cry = ocgpu.getResolution!

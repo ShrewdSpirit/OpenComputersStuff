@@ -1,5 +1,5 @@
 
--- GFX Lib By ShrewdSpirit
+-- SGFX Lib By ShrewdSpirit (Shrewd Graphics)
 -- A graphics library
 -- MIT License
 -- version 0.1
@@ -222,11 +222,12 @@ class GFX.Context
         }
         @driver driver
         displayType = @driver!\displayType!
-        @firstColor GFX.Colors[displayType].Red, GFX.Colors[displayType].White
+        @firstColor GFX.Colors[displayType].Black, GFX.Colors[displayType].White
     --------------------------------------
     -- sets or gets current driver being used
     driver: (driver) =>
         return @props.driver unless driver
+        assert driver, 'Given driver is invalid'
         @props.driver = driver
     --------------------------------------
     -- gets or sets the first color in color stack. this color cannot be popped out of stack
