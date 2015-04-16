@@ -11,10 +11,11 @@
 --      - Full ComputerCraft monitor support
 
 -- TODO:
---      - being able to automatically map colors. so monitors support screen colors
+--      - use same color table for both monitors and screens (convert screen supported colors to monitor supported colors!)
+--      - multi gpu support
 
 -- BUGS:
---      - you tell me!
+--      - there's a problem with resizing screens. it would be fixed if there was screen_resized event ;)
 
 ------------------------------------------------------
 -- Module imports
@@ -25,19 +26,8 @@ unicode = require'unicode'
 GFX = {}
 GFX.Util = {}
 ------------------------------------------------------
--- Utility functions
--- Checks if char is a unicode code or an ascii char
--- if you pass a char to it ('D' or whatever), it returns the same thing you've passed
--- if you pass a number or a string number, it returns its unicode char
-GFX.Util.checkUnicodeChar = (char) ->
-    if type(char) == 'number'
-        char = unicode.char(char)
-    elseif type(char) == 'string'
-        char = char\sub 1, 1
-    char
-------------------------------------------------------
 -- Colors
-GFX.MColors = { -- monitor supported colors
+GFX.MonitorColors = { -- monitor supported colors
     Black: 0x8000
     Blue: 0x800
     Green: 0x2000
@@ -55,7 +45,7 @@ GFX.MColors = { -- monitor supported colors
     LightGray: 0x100
     Brown: 0x1000
 }
-GFX.SColors = { -- screen supported colors
+GFX.Colors = { -- screen supported colors
     Black: 0x000000
     Blue: 0x3366CC
     Green: 0x57A64E
@@ -73,7 +63,30 @@ GFX.SColors = { -- screen supported colors
     LightGray: 0x999999
     Brown: 0x7F664C
 }
-GFX.Colors = monitor: GFX.MColors, m: GFX.MColors, screen: GFX.SColors, s: GFX.SColors
+------------------------------------------------------
+-- Utility functions
+-- Checks if char is a unicode code or an ascii char
+-- if you pass a char to it ('D' or whatever), it returns the same thing you've passed
+-- if you pass a number or a string number, it returns its unicode char
+GFX.Util.checkUnicodeChar = (char) ->
+    if type(char) == 'number'
+        char = unicode.char(char)
+    elseif type(char) == 'string'
+        char = char\sub 1, 1
+    char
+------------------------------------------------------
+-- Maps the given color to a monitor supported color
+GFX.Util.mapToMonitorColor = (color) ->
+    monitor_colors = { 0x8000, 0x800, 0x2000, 0x4000, 0x200, 0x400, 0x20, 0x40, 0x10, 0x1, 0x2, 0x4, 0x8, 0x80, 0x100, 0x1000 }
+    sort = (a, b) -> a < b
+    table.sort monitor_colors, sort
+    found = false
+    for i, c in ipairs monitor_colors
+        if c > color
+            found = i
+            break
+    found = #monitor_colors unless found
+    monitor_colors[found]
 ------------------------------------------------------
 -- Graphics driver used for detecting/working with gpus, screens and monitors
 class GFX.Driver
@@ -83,7 +96,7 @@ class GFX.Driver
             displays: {} -- display proxies
             activeDisplay: nil -- current display
         }
-        @flush!
+        @refresh!
     --------------------------------------
     -- gets or sets current gpu being used by driver
     gpu: (gpuproxy) =>
@@ -97,10 +110,11 @@ class GFX.Driver
         if displayID >= 1 and displayID <= #@displays!
             @props.activeDisplay = @display displayID
             @gpu!.bind(@display(displayID).address) if @displayType! == 'screen'
+            return displayID
     --------------------------------------
     -- sets the active display type (a screen or a monitor)
-    setActiveDisplayType: (type) =>
-        return false unless type
+    activeDisplayType: (type) =>
+        return @activeDisplay!.type unless type
         if type == 'monitor' or type == 'screen'
             for i,p in ipairs @displays!
                 if p.type == type
@@ -121,18 +135,26 @@ class GFX.Driver
     resolution: (width, height) =>
         @checkComponentAvailability!
         unless width and height
-            w, h = 0, 0
             w, h = @activeDisplay!.getSize! if @displayType! == 'monitor'
             w, h = @gpu!.getResolution! if @displayType! == 'screen'
             return w, h
         return @gpu!.setResolution width, height if @displayType! == 'screen'
         return false, "Monitors doesn't support changing resolution"
     --------------------------------------
+    -- gets the maximum resolution
+    maxResolution: =>
+        @checkComponentAvailability!
+        w, h = @activeDisplay!.getSize! if @displayType! == 'monitor'
+        w, h = @gpu!.maxResolution! if @displayType! == 'screen'
+        return w, h
+    --------------------------------------
     -- sets or gets the color of active display
     color: (bg, fg) =>
         @checkComponentAvailability!
         if bg and fg
             if @displayType! == 'monitor'
+                bg = GFX.Util.mapToMonitorColor bg
+                fg = GFX.Util.mapToMonitorColor fg
                 @activeDisplay!.setBackgroundColor bg
                 @activeDisplay!.setTextColor fg
             elseif @displayType! == 'screen'
@@ -180,27 +202,32 @@ class GFX.Driver
                 @activeDisplay!.setCursorPos x, i
                 @activeDisplay!.write line
     --------------------------------------
-    -- flushes the displays informations
+    -- refreshes the displays informations
     -- this should be called when a gpu,screen or monitor has been removed, added or resized
     -- stat is the event (run dmesg and try adding or removing screens,monitors)
     -- if stat is nil, driver will be reinitialized
-    flush: (stat) =>
+    refresh: (stat) =>
         assert occomponent.isAvailable('gpu'), 'No GPU was found.'
         assert occomponent.isAvailable('screen') or occomponent.isAvailable('monitor'), 'No screen or monitor was found.'
-        if stat
+        if type(stat) == 'table'
             if stat[1] == 'component_removed'
                 if stat[3] == 'monitor' or stat[3] == 'screen'
                     -- remove the component from displays
-                    found = false
+                    found = nil
                     for i, display in ipairs @displays!
-                        if @proxy(i).address == occomponent.proxy(stat[2]).address
+                        if @display(i).address == stat[2]
                             found = i
                             break
-                    if found then table.remove @displays!, found
+                    if found
+                        table.remove @displays!, found
+                        @activeDisplay #@displays!
+                        return 2
             elseif stat[1] == 'component_added'
                 if stat[3] == 'monitor' or stat[3] == 'screen'
-                    table.insert @displays!, stat[2]
-        else
+                    table.insert @displays!, occomponent.proxy(stat[2])
+                    return 1
+            return 0
+        else --refresh it all
             @gpu occomponent.getPrimary('gpu') -- get primary gpu
             -- get list of screens and monitors if available
             for address,type in occomponent.list()
@@ -221,8 +248,7 @@ class GFX.Context
             colorStack: {}
         }
         @driver driver
-        displayType = @driver!\displayType!
-        @firstColor GFX.Colors[displayType].Black, GFX.Colors[displayType].White
+        @firstColor GFX.Colors.Black, GFX.Colors.White
     --------------------------------------
     -- sets or gets current driver being used
     driver: (driver) =>
@@ -291,7 +317,7 @@ class GFX.Context
         fillChar = GFX.Util.checkUnicodeChar fillChar
         str = ''
         for i=1, len do str ..= fillChar
-        @driver!\set x, y, str, isVertical
+        @driver!\set x, y, str, vertical
     --------------------------------------
     -- Draws a text with given position and size. wrap wraps the text to new line if height > 1
     -- clip will trim the parts of text that are out of given height and width
@@ -299,7 +325,7 @@ class GFX.Context
     -- if hasFilledColor then it will pop a color from color stack
     --      this is useful when you want a different color for the box and another color for the text
     --      first pushed color will be used for text and second color will be applied to box
-    drawText: (text, x, y, w=0, h=0, valign='center', halign='center', wrap=false, clip=false, fill=false, hasFilledColor=false, fillChar=' ') =>
+    drawText: (text, x=1, y=1, w=0, h=0, valign='center', halign='center', wrap=false, clip=false, fill=false, hasFilledColor=false, fillChar=' ') =>
         if fill
             @drawBox x, y, w, h, fillChar
             @popColor! if hasFilledColor
@@ -366,8 +392,9 @@ class GFX.Context
     -- draws a border!
     -- borderSurrounding should be a table of these values:
     -- {topleft char,topcenter char,topright char,centerright char,bottomright char,bottomcenter char,bottomleft char,centerleft char}
-    drawBorder: (x, y, w, h, borderSurrounding, invertUpDownBorders=false, ignoreTopBottomBorders=false) =>unless borderSurrounding or type(borderSurrounding) == 'table'
-        borderSurrounding = {88,88,88,88,88,88,88,88} -- default thing
+    drawBorder: (x, y, w, h, borderSurrounding, invertUpDownBorders=false, ignoreTopBottomBorders=false) =>
+        unless borderSurrounding or type(borderSurrounding) == 'table'
+            borderSurrounding = {88,88,88,88,88,88,88,88} -- default thing
         if #borderSurrounding < 8 then for i = #borderSurrounding, 8 do table.insert borderSurrounding, 88 -- fill in the remaining space!
         tl,tc,tr = borderSurrounding[1], borderSurrounding[2], borderSurrounding[3]
         cl,cr = borderSurrounding[8], borderSurrounding[4]

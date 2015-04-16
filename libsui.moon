@@ -4,44 +4,23 @@
 -- MIT License
 -- Version 0.1
 
-
--- TODO:
---      draggable windows
---      add,remove,sendToBack,bringToFront use firstFocusableChild so there's always a focused component in wm or any other container
-
--- BUGS:
---      closing a window which is not focused, will freeze the wm. I think its because focusedC will be set to nil (nothing is focused and never will be focused!)
---      wm will bring the windows with odd zorders to front (while adding new ones) so odd zindex will be brought to front
-
--- NOTE:
---      Everything is fucked up. Rewrite needed. WindowManager shouldn't exist ...
-
-
 ------------------------------------------------------
--- Namespaces
-UI = {} -- UI namespace
-UI.Components = {} -- Components (window, button, etc)
-Util = {} -- Utility namespace
-GFX = {} -- Graphics namespace (draw shapes, text, etc)
+-- namespaces
+SUI = {}
+SUI.Util = {}
+SUI.Components = {}
 ------------------------------------------------------
--- OpenOS modules
+-- module imports
 ocevent = require'event'
 ocfs = require'filesystem'
 ocserialization = require'serialization'
 unicode = require'unicode'
-------------------------------------------------------
--- Custom modules
 package.loaded.json = nil
 json = require'json'
-package.loaded.libsgfx = nil
-gfx = require'libsgfx'
-------------------------------------------------------
--- GVars!
-compcounter = 0 --component counter. used for assigning IDs to components
 ------------------------------------------------------
 -- Utility functions
 -- copies a table (recursive or not) and returns the copied table
-Util.tblcpy = (tab, recursive) ->
+SUI.Util.tblcpy = (tab, recursive) ->
     shallowcopy = (orig) ->
         orig_type = type orig
         local copy
@@ -68,85 +47,91 @@ Util.tblcpy = (tab, recursive) ->
 ------------------------------------------------------
 -- Checks if given positions are inside given coordinates
 -- putting iy instead of Y causes iy be nil :/ ftw
-Util.intersect = (x, y, w, h, ix, Y) =>
+SUI.Util.intersect = (x, y, w, h, ix, Y) =>
     return true if ix >= x and ix < x + w and Y >= y and Y < y + h
     false
 ------------------------------------------------------
+-- default style thing. I should put it somewhere else!
+default_style = [[{
+"WindowManager": {
+    "background": "$n:0x00f000",
+    "textcolor": "$n:0xffffff"
+},
+"Window": {
+    "background": "$n:0x0000ff",
+    "hasborder": true,
+    "borderchars": "$t:9485,9473,9489,9474,9497,9473,9493,9474",
+    "bordercolor": "$n:0xffffff",
+    "titleborderchars": "$t:9485,9473,9489,9474,9509,9473,9501,9474",
+    "textbgcolor": "$n:0x0000ff",
+    "textfgcolor": "$n:0xdddddd",
+    "textpadding": 2,
+    "titlecolor": "$n:0x0000ff",
+    "titleheight": 3,
+    "titlevalign": "$s:center",
+    "titlehalign": "$s:left",
+    "hasnfc": true,
+    "nfbgc": "$n:0x555555",
+    "nffg": "$n:0xaaaaaa",
+    "titleclickbg": "$n:0xff0000",
+    "titleclickfg": "$n:0xffffff",
+    "closeicon": "$n:10005",
+    "closedelay": 0.3
+},
+"Box": {
+    "background": false,
+    "hasborder": true,
+    "borderchars": "$t:9556,9552,9559,9553,9565,9552,9562,9553"
+},
+"Label": {
+    "background": "$n:0xffffff",
+    "textcolor": "$n:0x000000"
+},
+"Button": {
+    "background": "$n:0x00ff00",
+    "textcolor": "$n:0x000000",
+    "clicksleep": 0.1,
+    "clickedbackground": "$n:0xff0000",
+    "clickedtextcolor": "$n:0xffffff",
+    "textvalign": "$s:center",
+    "texthalign": "$s:center",
+    "textpadding": 1,
+    "hasborder": true,
+    "borderchars": "$t:9556,9552,9559,9553,9565,9552,9562,9553"
+},
+"Toggle": {
+    "background": "$n:0x00ff00",
+    "textcolor": "$n:0x000000",
+    "clicksleep": 0.1,
+    "clickedbackground": "$n:0xff0000",
+    "clickedtextcolor": "$n:0xffffff",
+    "activebackground": "$n:0xff00ff",
+    "activetextcolor": "$n:0x000000",
+    "textvalign": "$s:center",
+    "texthalign": "$s:center",
+    "textpadding": 1,
+    "hasborder": true,
+    "borderchars": "$t:9556,9552,9559,9553,9565,9552,9562,9553"
+},
+"Progress": {
+    "background": "$n:0x00ff00",
+    "textcolor": "$n:0x000000",
+    "prgbackground": "$n:0x00ff00",
+    "prgtextcolor": "$n:0x0000ff",
+    "emptychar": "$c: ",
+    "prgchar": "$n:9552"
+}
+}]]
 -- Style class
-class UI.Style
+class SUI.Style
     new: (style) =>
         @style = {}
         @loadStyle style
+    --------------------------------------
     loadStyle: (style) =>
-        -- default style thing. I should put it somewhere else!
-        default_style = [[{
-                "Window": {
-                    "background": "$n:0x0000ff",
-                    "hasborder": true,
-                    "borderchars": "$t:9485,9473,9489,9474,9497,9473,9493,9474",
-                    "bordercolor": "$n:0xffffff",
-                    "titleborderchars": "$t:9485,9473,9489,9474,9509,9473,9501,9474",
-                    "textbgcolor": "$n:0x0000ff",
-                    "textfgcolor": "$n:0xdddddd",
-                    "textpadding": 2,
-                    "titlecolor": "$n:0x0000ff",
-                    "titleheight": 3,
-                    "titlevalign": "$s:center",
-                    "titlehalign": "$s:left",
-                    "hasnfc": true,
-                    "nfbgc": "$n:0x555555",
-                    "nffg": "$n:0xaaaaaa",
-                    "titleclickbg": "$n:0xff0000",
-                    "titleclickfg": "$n:0xffffff",
-                    "closeicon": "$n:10005"
-                },
-                "Box": {
-                    "background": false,
-                    "hasborder": true,
-                    "borderchars": "$t:9556,9552,9559,9553,9565,9552,9562,9553"
-                },
-                "Label": {
-                    "background": "$n:0xffffff",
-                    "textcolor": "$n:0x000000"
-                },
-                "Button": {
-                    "background": "$n:0x00ff00",
-                    "textcolor": "$n:0x000000",
-                    "clicksleep": 0.1,
-                    "clickedbackground": "$n:0xff0000",
-                    "clickedtextcolor": "$n:0xffffff",
-                    "textvalign": "$s:center",
-                    "texthalign": "$s:center",
-                    "textpadding": 1,
-                    "hasborder": true,
-                    "borderchars": "$t:9556,9552,9559,9553,9565,9552,9562,9553"
-                },
-                "Toggle": {
-                    "background": "$n:0x00ff00",
-                    "textcolor": "$n:0x000000",
-                    "clicksleep": 0.1,
-                    "clickedbackground": "$n:0xff0000",
-                    "clickedtextcolor": "$n:0xffffff",
-                    "activebackground": "$n:0xff00ff",
-                    "activetextcolor": "$n:0x000000",
-                    "textvalign": "$s:center",
-                    "texthalign": "$s:center",
-                    "textpadding": 1,
-                    "hasborder": true,
-                    "borderchars": "$t:9556,9552,9559,9553,9565,9552,9562,9553"
-                },
-                "Progress": {
-                    "background": "$n:0x00ff00",
-                    "textcolor": "$n:0x000000",
-                    "prgbackground": "$n:0x00ff00",
-                    "prgtextcolor": "$n:0x0000ff",
-                    "emptychar": "$c: ",
-                    "prgchar": "$n:9552"
-                }
-            }]]
         jsonstr = '' -- this is the whole string that's gonna be passed to json decoder and also it will be returned
         if style == 'default'
-            jsonstr = default_style 
+            jsonstr = default_style
         else -- If style is a file, it will read from the file else it should be a string
             -- and that string will be parsed as style
             if ocfs.exists style
@@ -182,98 +167,142 @@ class UI.Style
     prop: (prop, val) =>
         return @style[prop] unless val
         @style[prop] = val
+    --------------------------------------
     -- Gets or sets the given component's property in loaded style
     componentStyleProp: (component, prop, val) =>
         return @style[component][prop] unless val
         @style[component][prop] = val
+    --------------------------------------
     -- Gets or sets the component style. copies whole component style so changes wont affect the style itself
     componentStyle: (component, style) =>
-        return Util.tblcpy @style[component] unless style
-        @style[component] = Util.tblcpy style
+        return SUI.Util.tblcpy @style[component] unless style
+        @style[component] = SUI.Util.tblcpy style
+    --------------------------------------
 ------------------------------------------------------
--- Component base class. all other components should inherit from this class, even the custom components, else you'll fall in trouble
-class UI.Component
+-- Component base class
+class SUI.Component
     new: (type, x, y, w, h, text='') =>
         @props = {
             parent: nil, weight: 1
-            text: text, type: type --type: string. the name of class
+            text: text, type: type -- type: string. the name of class
             x: x, y: y, w: w, h: h -- these are used for rendering the component
-            cx: x, cy: y, cw: w, ch: h --constant coordinates used for getting the first position of component set by user or whoever else!
-            zorder: 0, zindex: 0 --zorder: index in parent's children, zindex: component's children index
-            style: {}, focused: false, focusable: false
-            visible: true, id: compcounter
+            cx: x, cy: y, cw: w, ch: h -- constant coordinates used for getting the first position of component set by user or whoever else!
+            zorder: 0, zindex: 0 -- zorder: index in parent's children, zindex: component's children index
+            style: {}, visible: true, id: 0
+            focused: false, focusable: false, focusedComponent: nil -- focused component is used by containers
             forceReceiveEvent: false,
+            -- extra properties used for events
+            epx: 0, epy: 0 -- previous pos
         }
         @children = {}
-        compcounter += 1 -- increase the component counter!
-        @style UI.DefaultStyle -- set the default style
-    prop: (prop, val) =>
-        return @props[prop] unless val
-        @props[prop] = val
-    --private properties. used for inherited stuff
-    pprop: (prop, c, val) =>
-        return @props[prop][c] unless val
-        @props[prop][c] = val
+        @style SUI.DefaultStyle -- set the default style
+        -- set component id
+        @props.id = SUI.WindowManager\cmpid! unless type == 'WindowManager'
+    --------------------------------------
+    -- gets or sets the parent. parent should be a component itself
     parent: (parent) =>
         return @props.parent unless parent
         @props.parent = parent
+    --------------------------------------
+    -- gets or sets the size of the component
     size: (w, h) =>
         return @props.cw, @props.ch unless w and h
         @props.w = w if w
         @props.h = h if h
         @props.cw, @props.ch = @props.w, @props.h
+    --------------------------------------
+    -- gets or sets the position of the component
     pos: (x, y) =>
         return @props.cx, @props.cy unless x and y
         @props.x = x if x
         @props.y = y if y
         @props.cx, @props.cy = @props.x, @props.y
+    --------------------------------------
+    -- gets or sets the component's weight. its used in automatic positioning layouts
     weight: (weight) =>
         return @props.weight unless weight
         @props.weight = weight
+    --------------------------------------
+    -- gets or sets the text. its only visible on components with text rendering
     text: (text) =>
         if text then @props.text = text
         else @props.text
+    --------------------------------------
+    -- gets or sets the component style
     style: (style) =>
         return @props.style unless style
         @props.style = style\componentStyle(@type!)
+    --------------------------------------
+    -- gets or sets the component's type text
     type: (type) =>
         return @props.type unless type
         @props.type = type
+    --------------------------------------
+    -- gets or sets the component's focused state. changing the focused state requires focusable property to be enabled
     focused: (state) =>
         return @props.focused if state == nil
-        if @props.parent then for i,c in ipairs @props.parent.children
-            c.props.focused = false
-        @props.focused = state
+        if @focusable!
+            if @props.parent then for i,c in ipairs @props.parent.children
+                c.props.focused = false
+            @props.focused = state
+    --------------------------------------
+    -- gets or sets the focusable state
+    focusable: (state) =>
+        return @props.focusable if state == nil
+        @props.focusable = state
+    --------------------------------------
+    -- gets or sets the container's focused component. returns true on assignment, false if no component could be focused
+    focusedComponent: (component) =>
+        return @props.focusedComponent unless component
+        -- unfocuse previous components
+        if component\focusable!
+            c\focused false for _,c in ipairs @children
+            component\focused true
+            @props.focusedComponent = component
+            return true
+        false
+    --------------------------------------
+    -- gets or sets the component visibility
     visible: (state) =>
         return @props.visible if state == nil
         @props.visible = state
+    --------------------------------------
+    -- compares this component with given component
     compare: (component) =>
         return true if @props.id == component.props.id
         false
+    --------------------------------------
+    -- checks if given point is inside component
     intersect: (x, y) =>
         return true if x >= @props.x and x < @props.x + @props.w and y >= @props.y and y < @props.y + @props.h
         false
+    --------------------------------------
+    -- adds a child to component
     add: (component) =>
         table.insert @children, component
         component\parent self
         component.props.zorder = @props.zindex
         @props.zindex += 1
-        -- set prev focused item to false
-        for i,c in ipairs @children
-            c\focused false if c.props.focusable and c\focused!
-        component\focused true if component.props.focusable
+        @focusedComponent component
+    --------------------------------------
+    -- removes the matching component from the children
     remove: (component) =>
         @sortChildren!
-        for i,c in ipairs @children
+        for _,c in ipairs @children
             if component\compare c
                 table.remove @children, component.props.zorder + 1 -- remove the component at that index!
                 component.props.zorder = 0
+                component.props.parent = nil
                 @props.zindex -= 1
-                component\focused false if component\focused!
                 @sortChildren! -- sort'em all again
-                @focuseFirstFocusableChild(@props.zindex) if @props.zindex > 0
+                component\focused false
+                @props.focusedComponent = nil
+                for i,c in ipairs @children do if @focusedComponent @children[@props.zindex - (i - 1)] then break -- focuse on last component
                 break
+    --------------------------------------
+    -- bring the component to front (if it has a parent of course)
     bringToFront: =>
+        return false unless @parent!
         @parent!\sortChildren!
         parentChilds = @parent!.children
         bringOne = @props.zorder
@@ -285,8 +314,11 @@ class UI.Component
                 bringElement = w
         @props.zorder = bringOne
         bringElement.props.zorder = oldOne
-        @parent!\focuseFirstFocusableChild bringOne
+        @parent!\focusedComponent parentChilds[bringOne]
         @parent!\sortChildren!
+        true
+    --------------------------------------
+    -- sends the component to back
     sendToBack: =>
         @parent!\sortChildren!
         parentChilds = @parent!.children
@@ -297,111 +329,145 @@ class UI.Component
                 table.insert willMove, w
         for _,w in ipairs willMove
             w.props.zorder += 1
-        focuseFirstFocusableChild willMove[1].props.zorder
         @props.zorder = 0
         @parent!\sortChildren!
-    -- focuses on first focusable children
-    focuseFirstFocusableChild: (startingZIndex) =>
-        -- starts from last component and finds first focusable component. returns nil if nothing was found
-        startingZIndex = #@children unless startingZIndex
-        for i=startingZIndex, 1, -1
-            if @children[i].props.focusable and not @children[i]\focused! then return @children[i]
-        return nil
+        for _,c in ipairs parentChilds do if @parent!\focusedComponent c then break -- focuse last focusable component!
+    --------------------------------------
+    -- sort the container's children
     sortChildren: =>
         sort = (a, b) -> a.props.zorder < b.props.zorder
         table.sort @children, sort
+    --------------------------------------
+    -- call children's draw function
     processChildren: =>
         @sortChildren!
         for i, component in ipairs(@children)
             component\draw! if component\visible!
-    -- callbacks
+    --------------------------------------
+    -- reposition callback
     reposition: =>
+    --------------------------------------
+    -- draw callback
     draw: =>
+    --------------------------------------
+    -- on event callback. this calls the event handler
     onEvent: (e) =>
-        UI.WindowManager\eventHandler e, self
+        SUI.WindowManager\eventHandler e, self
+    --------------------------------------
 ------------------------------------------------------
--- Components
-class UI.Components.WindowManager extends UI.Component
-    new: (maxResX, maxResY, resX, resY) =>
-        super 'WindowManager', 1, 1, resX, resY
-        @props.WindowManager = maxResX: maxResX, maxResY: maxResY, eventHandler: nil
-        @size resX, resY
-    -- this function sets or calls the event handler set
+class SUI.Components.WindowManager extends SUI.Component
+    new: (gctx, w=0, h=0) =>
+        super 'WindowManager', 1, 1, w, h
+        @props.WindowManager = gfx: gctx, cmpcntr: 0
+        @size w, h
+    --------------------------------------
+    -- gets or sets the graphics context
+    gfx: (gctx) =>
+        return @props.WindowManager.gfx unless gctx
+        @props.WindowManager.gfx = gctx
+    --------------------------------------
+    -- returns a component id
+    cmpid: =>
+        @props.WindowManager.cmpcntr += 1
+        @props.WindowManager.cmpcntr
+    --------------------------------------
+    -- sets or calls the event handler callback
     -- if you pass a function to it, it will set the event handler
     -- an event table will be passed to this function from other components to trigger the handler callback
-    eventHandler: (stuff, c) =>
+    -- stuff can be a function or event table
+    eventHandler: (stuff, component) =>
         if type(stuff) == 'function' then @props.WindowManager.eventHandler = stuff
-        elseif type(stuff) == 'table' then if type(@props.WindowManager.eventHandler) == 'function' then @props.WindowManager.eventHandler(c, stuff)
+        elseif type(stuff) == 'table' then if type(@props.WindowManager.eventHandler) == 'function' then @props.WindowManager.eventHandler(component, stuff)
+    --------------------------------------
+    -- gets or sets window manager size (screen resolution) returns true on successful resolution change
     size: (w, h) =>
-        return @props.w, @props.h unless w and h
-        w = 1 if w < 1
-        w = @props.WindowManager.maxResX if w > @props.WindowManager.maxResX
-        h = 1 if h < 1
-        h = @props.WindowManager.maxResY if h > @props.WindowManager.maxResY
-        @props.w = w if w
-        @props.h = h if h
-        ocgpu.setResolution @props.w, @props.h
-    maxSize: => @props.WindowManager.maxResX, @props.WindowManager.maxResY
-    process: =>
+        return @props.cw, @props.ch unless w and h
+        mw, mh = @gfx!\driver!\maxResolution!
+        w = mw if w > mw or w < 1
+        h = mh if h > mh or h < 1
+        @props.w = w
+        @props.h = h
+        @props.cw, @props.ch = @props.w, @props.h
+        return true if @gfx!\driver!\resolution w, h
+        false
+    --------------------------------------
+    -- the heart of the window manager! this should be called in a loop. it returns an event table
+    process: (timeout=0.1) =>
         @sortChildren!
-        tevt = table.pack ocevent.pull(0.1)
-        -- get focused component
-        local focusedC
-        for i,c in ipairs @children do if c\focused!
-            focusedC = c
-            break
-        -- trigger event on focused component if it was a touch or scroll event
-        if tevt[1] == 'key_down' or tevt[1] == 'scroll' or tevt[1] == 'key_up' or tevt[1] == 'touch' or tevt[1] == 'drag' or tevt[1] == 'drop' -- touch event should be taken care of
-            if focusedC
-                if tevt[1] != 'touch' and tevt[1] != 'drag' and tevt[1] != 'drop'
-                    focusedC\onEvent(tevt)
-                elseif focusedC\intersect tonumber(tevt[3]), tonumber(tevt[4])
-                    focusedC\onEvent(tevt)
-                else -- user has clicked somewhere out of focused component, if user has clicked on a child component, focusedC
-                    -- will be set to that component and both new and old focused components will swap their focuse state
-                    for i=#@children, 1, -1
-                        unless focusedC\compare @children[i]
-                            if @children[i]\intersect tonumber(tevt[3]), tonumber(tevt[4])
-                                focusedC\focused false
-                                focusedC = @children[i]
-                                focusedC\focused true
-                                focusedC\onEvent(tevt)
-                                focusedC\bringToFront!
-                                break
-            -- trigger event for components that are forced to receive the event
-            for j, cj in ipairs @children
-                if cj.props.forceReceiveEvent and cj\intersect(tonumber(tevt[3]), tonumber(tevt[4])) then cj\onEvent(tevt)
-        @draw!
-        tevt
-    draw: =>
+        e = table.pack ocevent.pull(timeout) -- retrieve an event
         if @visible!
-            GFX.pushColor @style!.background, @style!.textcolor
-            GFX.drawBox @props.x, @props.y, @props.w, @props.h
-            GFX.popColor!
-            @processChildren!
+            et = e[1] -- event type
+            -- trigger event on focused component if it was a touch or scroll event
+            if et == 'key_down' or et == 'scroll' or et == 'key_up' or et == 'touch' or et == 'drag' or et == 'drop' or et == 'monitor_touch' -- touch event should be taken care of
+                -- get focused component
+                focusedC = @focusedComponent!
+                if focusedC
+                    if et != 'touch' and et != 'drag' and et != 'drop' and et != 'monitor_touch'
+                        focusedC\onEvent(e)
+                    elseif focusedC\intersect(tonumber(e[3]), tonumber(e[4])) and (et == 'touch' or et == 'drag' or et == 'drop' or et == 'monitor_touch')
+                        focusedC\onEvent(e)
+                    else -- user has clicked somewhere out of focused component, if user has clicked on a child component, focusedC
+                        -- will be set to that component and both new and old focused components will swap their focuse state
+                        for i=#@children, 1, -1
+                            unless focusedC\compare @children[i]
+                                if @children[i]\intersect tonumber(e[3]), tonumber(e[4])
+                                    focusedC\focused false
+                                    focusedC = @children[i]
+                                    focusedC\focused true
+                                    focusedC\bringToFront!
+                                    focusedC\onEvent(e)
+                                    break
+                else -- nothing is focused, so focuse on something!
+                    if et == 'touch' or et == 'drag' or et == 'drop' or et == 'monitor_touch'
+                        for i=#@children, 1, -1 do if @children[i]\focusable!
+                            @children[i]\focused true
+                            @children[i]\bringToFront!
+                            @children[i]\onEvent(e)
+                            break
+                -- trigger event for components that are forced to receive the event
+                for j, cj in ipairs @children
+                    if cj.props.forceReceiveEvent and cj\intersect(tonumber(e[3]), tonumber(e[4])) then cj\onEvent(e)
+            @draw!
+        e -- return the event. so caller can see what the hell has happened!
+    --------------------------------------
+    draw: =>
+        SUI.WindowManager\gfx!\pushColor @style!.background, @style!.textcolor
+        SUI.WindowManager\gfx!\drawBox @props.x, @props.y, @props.w, @props.h
+        SUI.WindowManager\gfx!\popColor!
+        @processChildren!
+    --------------------------------------
 ------------------------------------------------------
-class UI.Components.Window extends UI.Component
-    new: (hasTitleBar=true, text='', x=0, y=0, w=0, h=0, hasCloseButton=true) =>
+class SUI.Components.Window extends SUI.Component
+    new: (text='', x=1, y=1, w=1, h=1, hasTitleBar=true, hasCloseButton=true) =>
         super 'Window', x, y, w, h, text
         @props.Window = {
             hasTitleBar: hasTitleBar, movable: hasTitleBar, hasCloseButton: hasCloseButton
+            beignDragged: false
         }
-        @props.focusable = true
+        @props.focusable = true -- a window should be focusable, else it won't receive any events
+    --------------------------------------
+    -- name says everything!
     hasCloseButton: (state) =>
         return @props.Window.hasCloseButton if state == nil
         @props.Window.hasCloseButton = state
+    --------------------------------------
+    -- name says everything!
     hasTitleBar: (state) =>
         return @props.Window.hasTitleBar if state == nil
         @props.Window.hasTitleBar = state
         @movable state
+    --------------------------------------
+    -- name says everything!
     movable: (state) =>
         return @props.Window.movable if state == nil
         @props.Window.movable = state
+    --------------------------------------
+    -- reposition the children, so they will be drawn in window content area
     reposition: =>
         mx, my = @pos!
         mw, mh = @size!
         if @hasTitleBar! then my += @style!.titleheight - 1
-        for i, c in ipairs @children-- some shitty calculations that I don't know what the hell is going on, they just work so let them be there!
+        for i, c in ipairs @children -- some shitty calculations that I don't know what the hell is going on, they just work so let them be there!
             x, y = c\pos!
             w, h = c\size!
             x = 1 if x < 1
@@ -418,55 +484,65 @@ class UI.Components.Window extends UI.Component
                 c.props.y = y
                 c.props.w = w
                 c.props.h = h
+    --------------------------------------
     draw: =>
         background, bordercolor, titlecolor, textbgcolor, textfgcolor = @style!.background,  @style!.bordercolor, @style!.titlecolor, @style!.textbgcolor, @style!.textfgcolor
-        unless @focused! and @style!.hasnfc
+        unless @focused! and @style!.hasnfc -- change window color if its not focused and supports notfocusecolor
             bg, fg = @style!.nfbgc, @style!.nffg
             background, bordercolor, titlecolor, textbgcolor, textfgcolor = bg, fg, bg, bg, fg
-        GFX.pushColor background, bordercolor
+        SUI.WindowManager\gfx!\pushColor background, bordercolor
         x, y, w, h = @props.x, @props.y, @props.w, @props.h
-        GFX.drawBox x, y, w, h
-        if @style!.hasborder
-            GFX.drawBorder x, y, w, h, @style!.borderchars, false, false
+        SUI.WindowManager\gfx!\drawBox x, y, w, h -- draw window box
+        if @style!.hasborder -- window border
+            SUI.WindowManager\gfx!\drawBorder x, y, w, h, @style!.borderchars, false, false
         @reposition!
-        @processChildren!
         if @hasTitleBar!
-            GFX.pushColor titlecolor, nil
-            GFX.drawBox x, y, w, @style!.titleheight
-            if @style!.hasborder
+            SUI.WindowManager\gfx!\pushColor titlecolor, nil
+            SUI.WindowManager\gfx!\drawBox x, y, w, @style!.titleheight -- titlebar box
+            if @style!.hasborder -- titlebar border
                 invertTopBottomBorders = false
                 invertTopBottomBorders = true if @style!.titleheight <= 1
-                GFX.pushColor nil, bordercolor
-                GFX.drawBorder x, y, w, @style!.titleheight, @style!.titleborderchars, invertTopBottomBorders
-                GFX.popColor!
-            GFX.pushColor textbgcolor, textfgcolor
-            textpadding = @style!.textpadding
-            GFX.drawText @text!, x + textpadding, y + (math.ceil(@style!.titleheight / 2) - 1),
+                SUI.WindowManager\gfx!\pushColor nil, bordercolor
+                SUI.WindowManager\gfx!\drawBorder x, y, w, @style!.titleheight, @style!.titleborderchars, invertTopBottomBorders
+                SUI.WindowManager\gfx!\popColor!
+            SUI.WindowManager\gfx!\pushColor textbgcolor, textfgcolor
+            textpadding = @style!.textpadding -- title
+            SUI.WindowManager\gfx!\drawText @text!, x + textpadding, y + (math.ceil(@style!.titleheight / 2) - 1),
                 w - textpadding * 2 - (textpadding + 2), math.ceil(@style!.titleheight / 2),
                 @style!.titlevalign, @style!.titlehalign, true, true
-            GFX.plot (@props.x + @props.w) - (textpadding + 2), y + (math.ceil(@style!.titleheight / 2) - 1), @style!.closeicon if @hasCloseButton!
-            GFX.popColor 2
-        GFX.popColor!
+            SUI.WindowManager\gfx!\plot (@props.x + @props.w) - (textpadding + 2), y + (math.ceil(@style!.titleheight / 2) - 1), @style!.closeicon if @hasCloseButton! -- close button
+            SUI.WindowManager\gfx!\popColor 2
+        SUI.WindowManager\gfx!\popColor!
+        @processChildren!
+    --------------------------------------
     onEvent: (e) =>
-        --no window dragging for now!
+        -- window dragging (NOT WORKING!)
         --if e[1] == 'drag' and @movable! -- check if the window is being dragged
-        --    if e[3] >= @props.x and e[3] < @props.x + @props.w and e[4] >= @props.y and e[4] < @props.y + @style!.titleheight - 1
-        --        @pos e[3], e[4]
-        --        return
+        --    if tonumber(e[3]) >= @props.x - 1 and tonumber(e[3]) < @props.x + @props.w and
+        --        tonumber(e[4]) >= @props.y - 1 and tonumber(e[4]) < @props.y + @style!.titleheight - 1
+        --    dx = tonumber(e[3]) - @props.epx
+        --    dy = tonumber(e[4]) - @props.epy
+        --    @pos @props.x + dx, @props.y + dy
+        --    @props.epx = tonumber(e[3])
+        --    @props.epy = tonumber(e[4])
+        --    return
         -- touch or scroll event
-        if e[1] == 'touch' or e[1] == 'scroll'
+        if e[1] == 'touch' or e[1] == 'scroll' or e[1] == 'monitor_touch'
+            @props.epx = tonumber(e[3])
+            @props.epy = tonumber(e[4])
             -- close click check
-            if e[1] == 'touch' and tonumber(e[5]) == 0 and @hasTitleBar! and @hasCloseButton!
-                textpadding = @style!.textpadding
+            if (e[1] == 'touch' or e[1] == 'monitor_touch') and tonumber(e[5]) == 0 and @hasTitleBar! and @hasCloseButton! -- if user clicked close button (if available)
+                textpadding = @style!.textpadding -- find the position of close button to check if click was inside of it
                 x, y, w, h = (@props.x + @props.w) - (textpadding + 2), @props.y + (math.ceil(@style!.titleheight / 2) - 1), 1, 1
                 mx, my = tonumber(e[3]), tonumber(e[4])
                 if mx >= x and mx < x + w and my >= y and my < y + h
-                    GFX.pushColor @style!.titleclickbg, @style!.titleclickfg
-                    GFX.plot (@props.x + @props.w) - (textpadding + 2), @props.y + (math.ceil(@style!.titleheight / 2) - 1), @style!.closeicon
-                    GFX.popColor!
-                    os.sleep(0.3)
-                    @focused true
+                    SUI.WindowManager\gfx!\pushColor @style!.titleclickbg, @style!.titleclickfg
+                    SUI.WindowManager\gfx!\plot (@props.x + @props.w) - (textpadding + 2), @props.y + (math.ceil(@style!.titleheight / 2) - 1), @style!.closeicon
+                    SUI.WindowManager\gfx!\popColor!
+                    os.sleep @style!.closedelay
                     @parent!\remove self
+                    ce = {'window_closed'} -- custom event
+                    SUI.WindowManager\eventHandler ce, self
                     return
             for i=#@children, 1, -1
                 if @children[i]\intersect tonumber(e[3]), tonumber(e[4])
@@ -477,63 +553,73 @@ class UI.Components.Window extends UI.Component
                     @children[i]\onEvent e
                     break
         super e
+    --------------------------------------
 ------------------------------------------------------
-class UI.Components.Tabview extends UI.Component
-------------------------------------------------------
-class UI.Components.Box extends UI.Component
-    new: (bg, fg, x=0, y=0, w=0, h=0, fillChar=' ') =>
+class SUI.Components.Box extends SUI.Component
+    new: (bg, fg, x=1, y=1, w=1, h=1, fillChar=' ') =>
         super 'Box', x, y, w, h
         @props.Box = bg: bg, fg: fg, fillChar: fillChar
+    --------------------------------------
     color: (bg, fg) =>
         return @props.Box.bg, @props.Box.fg unless bg and fg
         @props.Box.bg = bg
         @props.Box.fg = fg
+    --------------------------------------
     fillChar: (char) =>
         return @props.Box.fillChar unless char
         @props.Box.fillChar = char
+    --------------------------------------
     draw: =>
-        GFX.pushColor @props.Box.bg, @props.Box.fg
-        GFX.drawBox @props.x, @props.y, @props.w, @props.h, @fillChar!
-        GFX.drawBorder @props.x, @props.y, @props.w, @props.h, @style!.borderchars if @style!.hasborder
-        GFX.popColor!
+        SUI.WindowManager\gfx!\pushColor @props.Box.bg, @props.Box.fg
+        SUI.WindowManager\gfx!\drawBox @props.x, @props.y, @props.w, @props.h, @fillChar!
+        SUI.WindowManager\gfx!\drawBorder @props.x, @props.y, @props.w, @props.h, @style!.borderchars if @style!.hasborder
+        SUI.WindowManager\gfx!\popColor!
+    --------------------------------------
 ------------------------------------------------------
-class UI.Components.Label extends UI.Component
+class SUI.Components.Label extends SUI.Component
     new: (text='', x=0, y=0, w=0, h=0, valign='center', halign='center', wrap=false, clip=false) =>
         super 'Label', x, y, w, h, text
         @props.Label = valign: valign, halign: halign, wrap: wrap, clip: clip
+    --------------------------------------
     align: (valign, halign) =>
         return @props.Label.valign, @props.Label.halign if valign and halign
         valign = @props.Label.valign unless valign
         halign = @props.Label.halign unless halign
         @props.Label.valign = valign
         @props.Label.halign = halign
+    --------------------------------------
     wrap: (state) =>
         return @props.Label.wrap if state == nil
         @props.Label.wrap = state
+    --------------------------------------
     clip: (state) =>
         return @props.Label.clip if state == nil
         @props.Label.clip = state
+    --------------------------------------
     draw: =>
-        GFX.pushColor @style!.background, @style!.textcolor
-        GFX.drawText @text!, @props.x, @props.y, @props.w, @props.h, @props.Label.valign,
+        SUI.WindowManager\gfx!\pushColor @style!.background, @style!.textcolor
+        SUI.WindowManager\gfx!\drawText @text!, @props.x, @props.y, @props.w, @props.h, @props.Label.valign,
             @props.Label.halign, @props.Label.wrap, @props.Label.clip, @style!.background
-        GFX.popColor!
+        SUI.WindowManager\gfx!\popColor!
+    --------------------------------------
 ------------------------------------------------------
-class UI.Components.Button extends UI.Component
-    new: (text='', x=0, y=0, w=0, h=0) =>
+class SUI.Components.Button extends SUI.Component
+    new: (text='', x=1, y=1, w=1, h=1) =>
         super 'Button', x, y, w, h, text
         @props.Button = isClicked: false
+    --------------------------------------
     draw: =>
         bg, fg = @style!.background, @style!.textcolor
         bg, fg = @style!.clickedbackground, @style!.clickedtextcolor if @props.Button.isClicked
         padding = 0
         padding = @style!.textpadding if @style!.hasborder
         itbb = @props.h == 1 and true or false
-        GFX.pushColor bg, fg
-        GFX.drawBorder @props.x, @props.y, @props.w, @props.h, @style!.borderchars, false, itbb if @style!.hasborder
-        GFX.drawText @text!, @props.x + padding, @props.y, @props.w - padding * 2, @props.h, @style!.textvalign,
+        SUI.WindowManager\gfx!\pushColor bg, fg
+        SUI.WindowManager\gfx!\drawBorder @props.x, @props.y, @props.w, @props.h, @style!.borderchars, false, itbb if @style!.hasborder
+        SUI.WindowManager\gfx!\drawText @text!, @props.x + padding, @props.y, @props.w - padding * 2, @props.h, @style!.textvalign,
             @style!.texthalign, true, true, @style!.background
-        GFX.popColor!
+        SUI.WindowManager\gfx!\popColor!
+    --------------------------------------
     onEvent: (e) =>
         if e[1] == 'touch' and e[5] == 0
             @props.Button.isClicked = true
@@ -542,14 +628,17 @@ class UI.Components.Button extends UI.Component
             @props.Button.isClicked = false
             @draw!
         super e
+    --------------------------------------
 ------------------------------------------------------
-class UI.Components.Toggle extends UI.Component
-    new: (text='', x=0, y=0, w=0, h=0) =>
+class SUI.Components.Toggle extends SUI.Component
+    new: (text='', x=1, y=1, w=1, h=1) =>
         super 'Toggle', x, y, w, h, text
         @props.Toggle = isClicked: false, isActive: false
+    --------------------------------------
     active: (state) =>
         return @props.Toggle.isActive if state == nil
         @props.Toggle.isActive = state
+    --------------------------------------
     draw: =>
         bg, fg = @style!.background, @style!.textcolor
         bg, fg = @style!.clickedbackground, @style!.clickedtextcolor if @props.Toggle.isClicked
@@ -557,11 +646,12 @@ class UI.Components.Toggle extends UI.Component
         padding = 0
         padding = @style!.textpadding if @style!.hasborder
         itbb = @props.h == 1 and true or false
-        GFX.pushColor bg, fg
-        GFX.drawBorder @props.x, @props.y, @props.w, @props.h, @style!.borderchars, false, itbb if @style!.hasborder
-        GFX.drawText @text!, @props.x + padding, @props.y, @props.w - padding * 2, @props.h, @style!.textvalign,
+        SUI.WindowManager\gfx!\pushColor bg, fg
+        SUI.WindowManager\gfx!\drawBorder @props.x, @props.y, @props.w, @props.h, @style!.borderchars, false, itbb if @style!.hasborder
+        SUI.WindowManager\gfx!\drawText @text!, @props.x + padding, @props.y, @props.w - padding * 2, @props.h, @style!.textvalign,
             @style!.texthalign, true, true, @style!.background
-        GFX.popColor!
+        SUI.WindowManager\gfx!\popColor!
+    --------------------------------------
     onEvent: (e) =>
         if e[1] == 'touch' and e[5] == 0
             @props.Toggle.isClicked = true
@@ -571,37 +661,31 @@ class UI.Components.Toggle extends UI.Component
             @active(not @active!)
             @draw!
         super e
+    --------------------------------------
 ------------------------------------------------------
-class UI.Components.List extends UI.Component
-------------------------------------------------------
-class UI.Components.Spinner extends UI.Component
-------------------------------------------------------
-class UI.Components.Checkbox extends UI.Component
-------------------------------------------------------
-class UI.Components.Radiobox extends UI.Component
-------------------------------------------------------
-class UI.Components.Editbox extends UI.Component
-------------------------------------------------------
-class UI.Components.Progress extends UI.Component
-    new: (x=0, y=0, w=0, h=0, direction='hor') =>
+class SUI.Components.Progress extends SUI.Component
+    new: (x=1, y=1, w=1, h=1, direction='hor') =>
         super 'Progress', x, y, w, h
         @props.Progress = current: 0, direction: direction, inverted: inverted
+    --------------------------------------
     direction: (direction) =>
         return @props.Progress.direction unless direction
         @props.Progress.direction = direction if direction == 'ver' or direction == 'hor'
+    --------------------------------------
     inverted: (state) =>
         return @props.Progress.inverted if state == nil
         @props.Progress.inverted = state
+    --------------------------------------
     progress: (progress, min=0, max=1) =>
         return @props.Progress.current unless progress
         progress = min if progress < min
         progress = max if progress > max
-        --Y = (progress - min) / (max - min) * 100 --Y = (X-A)/(B-A) * (D-C) + C  [we have x between a,b want y between c,d]
-        @props.Progress.current = progress-- / 100
+        @props.Progress.current = progress
+    --------------------------------------
     draw: =>
-        GFX.pushColor @style!.background, @style!.textcolor
-        GFX.drawBox @props.x, @props.y, @props.w, @props.h, @style!.emptychar
-        GFX.pushColor @style!.prgbackground, @style!.prgtextcolor
+        SUI.WindowManager\gfx!\pushColor @style!.background, @style!.textcolor
+        SUI.WindowManager\gfx!\drawBox @props.x, @props.y, @props.w, @props.h, @style!.emptychar
+        SUI.WindowManager\gfx!\pushColor @style!.prgbackground, @style!.prgtextcolor
         sx, sy, sw, sh = @props.x, @props.y, @props.w, @props.h
         if @style!.hasborder
             sx += 1
@@ -610,27 +694,52 @@ class UI.Components.Progress extends UI.Component
             sh -= 2
         if @progress! > 0
             if @direction! == 'hor'
-                GFX.drawBox sx, sy, math.floor(sw * @progress!), sh, @style!.prgchar
+                SUI.WindowManager\gfx!\drawBox sx, sy, math.floor(sw * @progress!), sh, @style!.prgchar
             else
                 progress = math.floor(sh * @progress!)
-                GFX.drawBox sx, (sy + (sh - progress)), sw, progress, @style!.prgchar
-        GFX.drawBorder @props.x, @props.y, @props.w, @props.h, @style!.borderchars if @style!.hasborder
-        GFX.popColor 2
+                SUI.WindowManager\gfx!\drawBox sx, (sy + (sh - progress)), sw, progress, @style!.prgchar
+        SUI.WindowManager\gfx!\drawBorder @props.x, @props.y, @props.w, @props.h, @style!.borderchars if @style!.hasborder
+        SUI.WindowManager\gfx!\popColor 2
+    --------------------------------------
 ------------------------------------------------------
--- Initialization function
-UI.init = (resX, resY) ->
-    --return false if ocgpu.getDepth! < 4
-    mrx, mry = ocgpu.maxResolution!
-    crx, cry = ocgpu.getResolution!
-    resX = crx unless resX
-    resY = cry unless resY
-    resX = mrx if resX < 1 or resX > mrx
-    resY = mry if resY < 1 or resY > mry
-    GFX.firstColor GFX.Colors.Black, GFX.Colors.White
-    UI.DefaultStyle = UI.Style 'default'
-    UI.WindowManager = UI.Components.WindowManager mrx, mry, resX, resY
-    UI.WindowManager
+class SUI.Components.Tabs extends SUI.Component
+    --------------------------------------
 ------------------------------------------------------
--- Module returns
-{UI: UI, GFX: GFX}
+class SUI.Components.Panel extends SUI.Component
+    --------------------------------------
+------------------------------------------------------
+class SUI.Components.Modal extends SUI.Component
+    --------------------------------------
+------------------------------------------------------
+class SUI.Components.Layout extends SUI.Component
+    --------------------------------------
+------------------------------------------------------
+class SUI.Components.Scroller extends SUI.Component
+    --------------------------------------
+------------------------------------------------------
+class SUI.Components.List extends SUI.Component
+    --------------------------------------
+------------------------------------------------------
+class SUI.Components.Spinner extends SUI.Component
+    --------------------------------------
+------------------------------------------------------
+class SUI.Components.Checkbox extends SUI.Component
+    --------------------------------------
+------------------------------------------------------
+class SUI.Components.Radiobox extends SUI.Component
+    --------------------------------------
+------------------------------------------------------
+class SUI.Components.Editbox extends SUI.Component
+    --------------------------------------
+------------------------------------------------------
+-- initialization function. returns the window manager and assigned display width and height
+SUI.init = (gctx) ->
+    if gctx
+        SUI.DefaultStyle = SUI.Style 'default'
+        SUI.WindowManager = SUI.Components.WindowManager gctx
+        return SUI.WindowManager
+    nil
+------------------------------------------------------
+-- module returns
+SUI
 ------------------------------------------------------

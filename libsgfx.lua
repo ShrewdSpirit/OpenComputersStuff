@@ -2,15 +2,7 @@ local occomponent = require('component')
 local unicode = require('unicode')
 local GFX = { }
 GFX.Util = { }
-GFX.Util.checkUnicodeChar = function(char)
-  if type(char) == 'number' then
-    char = unicode.char(char)
-  elseif type(char) == 'string' then
-    char = char:sub(1, 1)
-  end
-  return char
-end
-GFX.MColors = {
+GFX.MonitorColors = {
   Black = 0x8000,
   Blue = 0x800,
   Green = 0x2000,
@@ -28,7 +20,7 @@ GFX.MColors = {
   LightGray = 0x100,
   Brown = 0x1000
 }
-GFX.SColors = {
+GFX.Colors = {
   Black = 0x000000,
   Blue = 0x3366CC,
   Green = 0x57A64E,
@@ -46,12 +38,50 @@ GFX.SColors = {
   LightGray = 0x999999,
   Brown = 0x7F664C
 }
-GFX.Colors = {
-  monitor = GFX.MColors,
-  m = GFX.MColors,
-  screen = GFX.SColors,
-  s = GFX.SColors
-}
+GFX.Util.checkUnicodeChar = function(char)
+  if type(char) == 'number' then
+    char = unicode.char(char)
+  elseif type(char) == 'string' then
+    char = char:sub(1, 1)
+  end
+  return char
+end
+GFX.Util.mapToMonitorColor = function(color)
+  local monitor_colors = {
+    0x8000,
+    0x800,
+    0x2000,
+    0x4000,
+    0x200,
+    0x400,
+    0x20,
+    0x40,
+    0x10,
+    0x1,
+    0x2,
+    0x4,
+    0x8,
+    0x80,
+    0x100,
+    0x1000
+  }
+  local sort
+  sort = function(a, b)
+    return a < b
+  end
+  table.sort(monitor_colors, sort)
+  local found = false
+  for i, c in ipairs(monitor_colors) do
+    if c > color then
+      found = i
+      break
+    end
+  end
+  if not (found) then
+    found = #monitor_colors
+  end
+  return monitor_colors[found]
+end
 do
   local _base_0 = {
     gpu = function(self, gpuproxy)
@@ -70,13 +100,14 @@ do
       if displayID >= 1 and displayID <= #self:displays() then
         self.props.activeDisplay = self:display(displayID)
         if self:displayType() == 'screen' then
-          return self:gpu().bind(self:display(displayID).address)
+          self:gpu().bind(self:display(displayID).address)
         end
+        return displayID
       end
     end,
-    setActiveDisplayType = function(self, type)
+    activeDisplayType = function(self, type)
       if not (type) then
-        return false
+        return self:activeDisplay().type
       end
       if type == 'monitor' or type == 'screen' then
         for i, p in ipairs(self:displays()) do
@@ -100,7 +131,7 @@ do
     resolution = function(self, width, height)
       self:checkComponentAvailability()
       if not (width and height) then
-        local w, h = 0, 0
+        local w, h
         if self:displayType() == 'monitor' then
           w, h = self:activeDisplay().getSize()
         end
@@ -114,10 +145,23 @@ do
       end
       return false, "Monitors doesn't support changing resolution"
     end,
+    maxResolution = function(self)
+      self:checkComponentAvailability()
+      local w, h
+      if self:displayType() == 'monitor' then
+        w, h = self:activeDisplay().getSize()
+      end
+      if self:displayType() == 'screen' then
+        w, h = self:gpu().maxResolution()
+      end
+      return w, h
+    end,
     color = function(self, bg, fg)
       self:checkComponentAvailability()
       if bg and fg then
         if self:displayType() == 'monitor' then
+          bg = GFX.Util.mapToMonitorColor(bg)
+          fg = GFX.Util.mapToMonitorColor(fg)
           self:activeDisplay().setBackgroundColor(bg)
           return self:activeDisplay().setTextColor(fg)
         elseif self:displayType() == 'screen' then
@@ -174,28 +218,32 @@ do
         end
       end
     end,
-    flush = function(self, stat)
+    refresh = function(self, stat)
       assert(occomponent.isAvailable('gpu'), 'No GPU was found.')
       assert(occomponent.isAvailable('screen') or occomponent.isAvailable('monitor'), 'No screen or monitor was found.')
-      if stat then
+      if type(stat) == 'table' then
         if stat[1] == 'component_removed' then
           if stat[3] == 'monitor' or stat[3] == 'screen' then
-            local found = false
+            local found = nil
             for i, display in ipairs(self:displays()) do
-              if self:proxy(i).address == occomponent.proxy(stat[2]).address then
+              if self:display(i).address == stat[2] then
                 found = i
                 break
               end
             end
             if found then
-              return table.remove(self:displays(), found)
+              table.remove(self:displays(), found)
+              self:activeDisplay(#self:displays())
+              return 2
             end
           end
         elseif stat[1] == 'component_added' then
           if stat[3] == 'monitor' or stat[3] == 'screen' then
-            return table.insert(self:displays(), stat[2])
+            table.insert(self:displays(), occomponent.proxy(stat[2]))
+            return 1
           end
         end
+        return 0
       else
         self:gpu(occomponent.getPrimary('gpu'))
         for address, type in occomponent.list() do
@@ -219,7 +267,7 @@ do
         displays = { },
         activeDisplay = nil
       }
-      return self:flush()
+      return self:refresh()
     end,
     __base = _base_0,
     __name = "Driver"
@@ -345,9 +393,15 @@ do
       for i = 1, len do
         str = str .. fillChar
       end
-      return self:driver():set(x, y, str, isVertical)
+      return self:driver():set(x, y, str, vertical)
     end,
     drawText = function(self, text, x, y, w, h, valign, halign, wrap, clip, fill, hasFilledColor, fillChar)
+      if x == nil then
+        x = 1
+      end
+      if y == nil then
+        y = 1
+      end
       if w == nil then
         w = 0
       end
@@ -488,37 +542,37 @@ do
           88,
           88
         }
-        if #borderSurrounding < 8 then
-          for i = #borderSurrounding, 8 do
-            table.insert(borderSurrounding, 88)
-          end
+      end
+      if #borderSurrounding < 8 then
+        for i = #borderSurrounding, 8 do
+          table.insert(borderSurrounding, 88)
         end
-        local tl, tc, tr = borderSurrounding[1], borderSurrounding[2], borderSurrounding[3]
-        local cl, cr = borderSurrounding[8], borderSurrounding[4]
-        local bl, bc, br = borderSurrounding[7], borderSurrounding[6], borderSurrounding[5]
-        if invertTopBottomBorders then
-          local l, c, r = tl, tc, tr
-          tl, tc, tr = bl, bc, br
-          bl, bc, br = l, c, r
-        end
-        if not (ignoreTopBottomBorders) then
-          self:plot(x, y, tl)
-          self:drawStaticLine(x + 1, y, w - 2, false, tc)
-          self:plot(x + w - 1, y, tr)
-        end
-        local lbx, lby, lbl = x, y + 1, h - 2
-        local rbx, rby, rbl = x + w - 1, y + 1, h - 2
-        if ignoreTopBottomBorders then
-          lby, lbl = y, h
-          rby, rbl = y, h
-        end
-        self:drawStaticLine(lbx, lby, lbl, true, cl)
-        self:drawStaticLine(rbx, rby, rbl, true, cr)
-        if not (ignoreTopBottomBorders) then
-          self:plot(x, y + h - 1, bl)
-          self:drawStaticLine(x + 1, y + h - 1, w - 2, false, bc)
-          return self:plot(x + w - 1, y + h - 1, br)
-        end
+      end
+      local tl, tc, tr = borderSurrounding[1], borderSurrounding[2], borderSurrounding[3]
+      local cl, cr = borderSurrounding[8], borderSurrounding[4]
+      local bl, bc, br = borderSurrounding[7], borderSurrounding[6], borderSurrounding[5]
+      if invertTopBottomBorders then
+        local l, c, r = tl, tc, tr
+        tl, tc, tr = bl, bc, br
+        bl, bc, br = l, c, r
+      end
+      if not (ignoreTopBottomBorders) then
+        self:plot(x, y, tl)
+        self:drawStaticLine(x + 1, y, w - 2, false, tc)
+        self:plot(x + w - 1, y, tr)
+      end
+      local lbx, lby, lbl = x, y + 1, h - 2
+      local rbx, rby, rbl = x + w - 1, y + 1, h - 2
+      if ignoreTopBottomBorders then
+        lby, lbl = y, h
+        rby, rbl = y, h
+      end
+      self:drawStaticLine(lbx, lby, lbl, true, cl)
+      self:drawStaticLine(rbx, rby, rbl, true, cr)
+      if not (ignoreTopBottomBorders) then
+        self:plot(x, y + h - 1, bl)
+        self:drawStaticLine(x + 1, y + h - 1, w - 2, false, bc)
+        return self:plot(x + w - 1, y + h - 1, br)
       end
     end,
     clear = function(self)
@@ -534,8 +588,7 @@ do
         colorStack = { }
       }
       self:driver(driver)
-      local displayType = self:driver():displayType()
-      return self:firstColor(GFX.Colors[displayType].Black, GFX.Colors[displayType].White)
+      return self:firstColor(GFX.Colors.Black, GFX.Colors.White)
     end,
     __base = _base_0,
     __name = "Context"

@@ -1,17 +1,13 @@
-local UI = { }
-UI.Components = { }
-local Util = { }
-local GFX = { }
+local SUI = { }
+SUI.Util = { }
+SUI.Components = { }
 local ocevent = require('event')
 local ocfs = require('filesystem')
 local ocserialization = require('serialization')
 local unicode = require('unicode')
 package.loaded.json = nil
 local json = require('json')
-package.loaded.libsgfx = nil
-local gfx = require('libsgfx')
-local compcounter = 0
-Util.tblcpy = function(tab, recursive)
+SUI.Util.tblcpy = function(tab, recursive)
   local shallowcopy
   shallowcopy = function(orig)
     local orig_type = type(orig)
@@ -47,80 +43,85 @@ Util.tblcpy = function(tab, recursive)
     return shallowcopy(tab)
   end
 end
-Util.intersect = function(self, x, y, w, h, ix, Y)
+SUI.Util.intersect = function(self, x, y, w, h, ix, Y)
   if ix >= x and ix < x + w and Y >= y and Y < y + h then
     return true
   end
   return false
 end
+local default_style = [[{
+"WindowManager": {
+    "background": "$n:0x00f000",
+    "textcolor": "$n:0xffffff"
+},
+"Window": {
+    "background": "$n:0x0000ff",
+    "hasborder": true,
+    "borderchars": "$t:9485,9473,9489,9474,9497,9473,9493,9474",
+    "bordercolor": "$n:0xffffff",
+    "titleborderchars": "$t:9485,9473,9489,9474,9509,9473,9501,9474",
+    "textbgcolor": "$n:0x0000ff",
+    "textfgcolor": "$n:0xdddddd",
+    "textpadding": 2,
+    "titlecolor": "$n:0x0000ff",
+    "titleheight": 3,
+    "titlevalign": "$s:center",
+    "titlehalign": "$s:left",
+    "hasnfc": true,
+    "nfbgc": "$n:0x555555",
+    "nffg": "$n:0xaaaaaa",
+    "titleclickbg": "$n:0xff0000",
+    "titleclickfg": "$n:0xffffff",
+    "closeicon": "$n:10005",
+    "closedelay": 0.3
+},
+"Box": {
+    "background": false,
+    "hasborder": true,
+    "borderchars": "$t:9556,9552,9559,9553,9565,9552,9562,9553"
+},
+"Label": {
+    "background": "$n:0xffffff",
+    "textcolor": "$n:0x000000"
+},
+"Button": {
+    "background": "$n:0x00ff00",
+    "textcolor": "$n:0x000000",
+    "clicksleep": 0.1,
+    "clickedbackground": "$n:0xff0000",
+    "clickedtextcolor": "$n:0xffffff",
+    "textvalign": "$s:center",
+    "texthalign": "$s:center",
+    "textpadding": 1,
+    "hasborder": true,
+    "borderchars": "$t:9556,9552,9559,9553,9565,9552,9562,9553"
+},
+"Toggle": {
+    "background": "$n:0x00ff00",
+    "textcolor": "$n:0x000000",
+    "clicksleep": 0.1,
+    "clickedbackground": "$n:0xff0000",
+    "clickedtextcolor": "$n:0xffffff",
+    "activebackground": "$n:0xff00ff",
+    "activetextcolor": "$n:0x000000",
+    "textvalign": "$s:center",
+    "texthalign": "$s:center",
+    "textpadding": 1,
+    "hasborder": true,
+    "borderchars": "$t:9556,9552,9559,9553,9565,9552,9562,9553"
+},
+"Progress": {
+    "background": "$n:0x00ff00",
+    "textcolor": "$n:0x000000",
+    "prgbackground": "$n:0x00ff00",
+    "prgtextcolor": "$n:0x0000ff",
+    "emptychar": "$c: ",
+    "prgchar": "$n:9552"
+}
+}]]
 do
   local _base_0 = {
     loadStyle = function(self, style)
-      local default_style = [[{
-                "Window": {
-                    "background": "$n:0x0000ff",
-                    "hasborder": true,
-                    "borderchars": "$t:9485,9473,9489,9474,9497,9473,9493,9474",
-                    "bordercolor": "$n:0xffffff",
-                    "titleborderchars": "$t:9485,9473,9489,9474,9509,9473,9501,9474",
-                    "textbgcolor": "$n:0x0000ff",
-                    "textfgcolor": "$n:0xdddddd",
-                    "textpadding": 2,
-                    "titlecolor": "$n:0x0000ff",
-                    "titleheight": 3,
-                    "titlevalign": "$s:center",
-                    "titlehalign": "$s:left",
-                    "hasnfc": true,
-                    "nfbgc": "$n:0x555555",
-                    "nffg": "$n:0xaaaaaa",
-                    "titleclickbg": "$n:0xff0000",
-                    "titleclickfg": "$n:0xffffff",
-                    "closeicon": "$n:10005"
-                },
-                "Box": {
-                    "background": false,
-                    "hasborder": true,
-                    "borderchars": "$t:9556,9552,9559,9553,9565,9552,9562,9553"
-                },
-                "Label": {
-                    "background": "$n:0xffffff",
-                    "textcolor": "$n:0x000000"
-                },
-                "Button": {
-                    "background": "$n:0x00ff00",
-                    "textcolor": "$n:0x000000",
-                    "clicksleep": 0.1,
-                    "clickedbackground": "$n:0xff0000",
-                    "clickedtextcolor": "$n:0xffffff",
-                    "textvalign": "$s:center",
-                    "texthalign": "$s:center",
-                    "textpadding": 1,
-                    "hasborder": true,
-                    "borderchars": "$t:9556,9552,9559,9553,9565,9552,9562,9553"
-                },
-                "Toggle": {
-                    "background": "$n:0x00ff00",
-                    "textcolor": "$n:0x000000",
-                    "clicksleep": 0.1,
-                    "clickedbackground": "$n:0xff0000",
-                    "clickedtextcolor": "$n:0xffffff",
-                    "activebackground": "$n:0xff00ff",
-                    "activetextcolor": "$n:0x000000",
-                    "textvalign": "$s:center",
-                    "texthalign": "$s:center",
-                    "textpadding": 1,
-                    "hasborder": true,
-                    "borderchars": "$t:9556,9552,9559,9553,9565,9552,9562,9553"
-                },
-                "Progress": {
-                    "background": "$n:0x00ff00",
-                    "textcolor": "$n:0x000000",
-                    "prgbackground": "$n:0x00ff00",
-                    "prgtextcolor": "$n:0x0000ff",
-                    "emptychar": "$c: ",
-                    "prgchar": "$n:9552"
-                }
-            }]]
       local jsonstr = ''
       if style == 'default' then
         jsonstr = default_style
@@ -195,9 +196,9 @@ do
     end,
     componentStyle = function(self, component, style)
       if not (style) then
-        return Util.tblcpy(self.style[component])
+        return SUI.Util.tblcpy(self.style[component])
       end
-      self.style[component] = Util.tblcpy(style)
+      self.style[component] = SUI.Util.tblcpy(style)
     end
   }
   _base_0.__index = _base_0
@@ -217,22 +218,10 @@ do
     end
   })
   _base_0.__class = _class_0
-  UI.Style = _class_0
+  SUI.Style = _class_0
 end
 do
   local _base_0 = {
-    prop = function(self, prop, val)
-      if not (val) then
-        return self.props[prop]
-      end
-      self.props[prop] = val
-    end,
-    pprop = function(self, prop, c, val)
-      if not (val) then
-        return self.props[prop][c]
-      end
-      self.props[prop][c] = val
-    end,
     parent = function(self, parent)
       if not (parent) then
         return self.props.parent
@@ -292,12 +281,34 @@ do
       if state == nil then
         return self.props.focused
       end
-      if self.props.parent then
-        for i, c in ipairs(self.props.parent.children) do
-          c.props.focused = false
+      if self:focusable() then
+        if self.props.parent then
+          for i, c in ipairs(self.props.parent.children) do
+            c.props.focused = false
+          end
         end
+        self.props.focused = state
       end
-      self.props.focused = state
+    end,
+    focusable = function(self, state)
+      if state == nil then
+        return self.props.focusable
+      end
+      self.props.focusable = state
+    end,
+    focusedComponent = function(self, component)
+      if not (component) then
+        return self.props.focusedComponent
+      end
+      if component:focusable() then
+        for _, c in ipairs(self.children) do
+          c:focused(false)
+        end
+        component:focused(true)
+        self.props.focusedComponent = component
+        return true
+      end
+      return false
     end,
     visible = function(self, state)
       if state == nil then
@@ -322,34 +333,32 @@ do
       component:parent(self)
       component.props.zorder = self.props.zindex
       self.props.zindex = self.props.zindex + 1
-      for i, c in ipairs(self.children) do
-        if c.props.focusable and c:focused() then
-          c:focused(false)
-        end
-      end
-      if component.props.focusable then
-        return component:focused(true)
-      end
+      return self:focusedComponent(component)
     end,
     remove = function(self, component)
       self:sortChildren()
-      for i, c in ipairs(self.children) do
+      for _, c in ipairs(self.children) do
         if component:compare(c) then
           table.remove(self.children, component.props.zorder + 1)
           component.props.zorder = 0
+          component.props.parent = nil
           self.props.zindex = self.props.zindex - 1
-          if component:focused() then
-            component:focused(false)
-          end
           self:sortChildren()
-          if self.props.zindex > 0 then
-            self:focuseFirstFocusableChild(self.props.zindex)
+          component:focused(false)
+          self.props.focusedComponent = nil
+          for i, c in ipairs(self.children) do
+            if self:focusedComponent(self.children[self.props.zindex - (i - 1)]) then
+              break
+            end
           end
           break
         end
       end
     end,
     bringToFront = function(self)
+      if not (self:parent()) then
+        return false
+      end
       self:parent():sortChildren()
       local parentChilds = self:parent().children
       local bringOne = self.props.zorder
@@ -363,8 +372,9 @@ do
       end
       self.props.zorder = bringOne
       bringElement.props.zorder = oldOne
-      self:parent():focuseFirstFocusableChild(bringOne)
-      return self:parent():sortChildren()
+      self:parent():focusedComponent(parentChilds[bringOne])
+      self:parent():sortChildren()
+      return true
     end,
     sendToBack = function(self)
       self:parent():sortChildren()
@@ -379,20 +389,13 @@ do
       for _, w in ipairs(willMove) do
         w.props.zorder = w.props.zorder + 1
       end
-      focuseFirstFocusableChild(willMove[1].props.zorder)
       self.props.zorder = 0
-      return self:parent():sortChildren()
-    end,
-    focuseFirstFocusableChild = function(self, startingZIndex)
-      if not (startingZIndex) then
-        startingZIndex = #self.children
-      end
-      for i = startingZIndex, 1, -1 do
-        if self.children[i].props.focusable and not self.children[i]:focused() then
-          return self.children[i]
+      self:parent():sortChildren()
+      for _, c in ipairs(parentChilds) do
+        if self:parent():focusedComponent(c) then
+          break
         end
       end
-      return nil
     end,
     sortChildren = function(self)
       local sort
@@ -412,7 +415,7 @@ do
     reposition = function(self) end,
     draw = function(self) end,
     onEvent = function(self, e)
-      return UI.WindowManager:eventHandler(e, self)
+      return SUI.WindowManager:eventHandler(e, self)
     end
   }
   _base_0.__index = _base_0
@@ -437,15 +440,20 @@ do
         zorder = 0,
         zindex = 0,
         style = { },
+        visible = true,
+        id = 0,
         focused = false,
         focusable = false,
-        visible = true,
-        id = compcounter,
-        forceReceiveEvent = false
+        focusedComponent = nil,
+        forceReceiveEvent = false,
+        epx = 0,
+        epy = 0
       }
       self.children = { }
-      compcounter = compcounter + 1
-      return self:style(UI.DefaultStyle)
+      self:style(SUI.DefaultStyle)
+      if not (type == 'WindowManager') then
+        self.props.id = SUI.WindowManager:cmpid()
+      end
     end,
     __base = _base_0,
     __name = "Component"
@@ -458,107 +466,123 @@ do
     end
   })
   _base_0.__class = _class_0
-  UI.Component = _class_0
+  SUI.Component = _class_0
 end
 do
-  local _parent_0 = UI.Component
+  local _parent_0 = SUI.Component
   local _base_0 = {
-    eventHandler = function(self, stuff, c)
+    gfx = function(self, gctx)
+      if not (gctx) then
+        return self.props.WindowManager.gfx
+      end
+      self.props.WindowManager.gfx = gctx
+    end,
+    cmpid = function(self)
+      self.props.WindowManager.cmpcntr = self.props.WindowManager.cmpcntr + 1
+      return self.props.WindowManager.cmpcntr
+    end,
+    eventHandler = function(self, stuff, component)
       if type(stuff) == 'function' then
         self.props.WindowManager.eventHandler = stuff
       elseif type(stuff) == 'table' then
         if type(self.props.WindowManager.eventHandler) == 'function' then
-          return self.props.WindowManager.eventHandler(c, stuff)
+          return self.props.WindowManager.eventHandler(component, stuff)
         end
       end
     end,
     size = function(self, w, h)
       if not (w and h) then
-        return self.props.w, self.props.h
+        return self.props.cw, self.props.ch
       end
-      if w < 1 then
-        w = 1
+      local mw, mh = self:gfx():driver():maxResolution()
+      if w > mw or w < 1 then
+        w = mw
       end
-      if w > self.props.WindowManager.maxResX then
-        w = self.props.WindowManager.maxResX
+      if h > mh or h < 1 then
+        h = mh
       end
-      if h < 1 then
-        h = 1
+      self.props.w = w
+      self.props.h = h
+      self.props.cw, self.props.ch = self.props.w, self.props.h
+      if self:gfx():driver():resolution(w, h) then
+        return true
       end
-      if h > self.props.WindowManager.maxResY then
-        h = self.props.WindowManager.maxResY
-      end
-      if w then
-        self.props.w = w
-      end
-      if h then
-        self.props.h = h
-      end
-      return ocgpu.setResolution(self.props.w, self.props.h)
+      return false
     end,
-    maxSize = function(self)
-      return self.props.WindowManager.maxResX, self.props.WindowManager.maxResY
-    end,
-    process = function(self)
+    process = function(self, timeout)
+      if timeout == nil then
+        timeout = 0.1
+      end
       self:sortChildren()
-      local tevt = table.pack(ocevent.pull(0.1))
-      local focusedC
-      for i, c in ipairs(self.children) do
-        if c:focused() then
-          focusedC = c
-          break
-        end
-      end
-      if tevt[1] == 'key_down' or tevt[1] == 'scroll' or tevt[1] == 'key_up' or tevt[1] == 'touch' or tevt[1] == 'drag' or tevt[1] == 'drop' then
-        if focusedC then
-          if tevt[1] ~= 'touch' and tevt[1] ~= 'drag' and tevt[1] ~= 'drop' then
-            focusedC:onEvent(tevt)
-          elseif focusedC:intersect(tonumber(tevt[3]), tonumber(tevt[4])) then
-            focusedC:onEvent(tevt)
+      local e = table.pack(ocevent.pull(timeout))
+      if self:visible() then
+        local et = e[1]
+        if et == 'key_down' or et == 'scroll' or et == 'key_up' or et == 'touch' or et == 'drag' or et == 'drop' or et == 'monitor_touch' then
+          local focusedC = self:focusedComponent()
+          if focusedC then
+            if et ~= 'touch' and et ~= 'drag' and et ~= 'drop' and et ~= 'monitor_touch' then
+              focusedC:onEvent(e)
+            elseif focusedC:intersect(tonumber(e[3]), tonumber(e[4])) and (et == 'touch' or et == 'drag' or et == 'drop' or et == 'monitor_touch') then
+              focusedC:onEvent(e)
+            else
+              for i = #self.children, 1, -1 do
+                if not (focusedC:compare(self.children[i])) then
+                  if self.children[i]:intersect(tonumber(e[3]), tonumber(e[4])) then
+                    focusedC:focused(false)
+                    focusedC = self.children[i]
+                    focusedC:focused(true)
+                    focusedC:bringToFront()
+                    focusedC:onEvent(e)
+                    break
+                  end
+                end
+              end
+            end
           else
-            for i = #self.children, 1, -1 do
-              if not (focusedC:compare(self.children[i])) then
-                if self.children[i]:intersect(tonumber(tevt[3]), tonumber(tevt[4])) then
-                  focusedC:focused(false)
-                  focusedC = self.children[i]
-                  focusedC:focused(true)
-                  focusedC:onEvent(tevt)
-                  focusedC:bringToFront()
+            if et == 'touch' or et == 'drag' or et == 'drop' or et == 'monitor_touch' then
+              for i = #self.children, 1, -1 do
+                if self.children[i]:focusable() then
+                  self.children[i]:focused(true)
+                  self.children[i]:bringToFront()
+                  self.children[i]:onEvent(e)
                   break
                 end
               end
             end
           end
-        end
-        for j, cj in ipairs(self.children) do
-          if cj.props.forceReceiveEvent and cj:intersect(tonumber(tevt[3]), tonumber(tevt[4])) then
-            cj:onEvent(tevt)
+          for j, cj in ipairs(self.children) do
+            if cj.props.forceReceiveEvent and cj:intersect(tonumber(e[3]), tonumber(e[4])) then
+              cj:onEvent(e)
+            end
           end
         end
+        self:draw()
       end
-      self:draw()
-      return tevt
+      return e
     end,
     draw = function(self)
-      if self:visible() then
-        GFX.pushColor(self:style().background, self:style().textcolor)
-        GFX.drawBox(self.props.x, self.props.y, self.props.w, self.props.h)
-        GFX.popColor()
-        return self:processChildren()
-      end
+      SUI.WindowManager:gfx():pushColor(self:style().background, self:style().textcolor)
+      SUI.WindowManager:gfx():drawBox(self.props.x, self.props.y, self.props.w, self.props.h)
+      SUI.WindowManager:gfx():popColor()
+      return self:processChildren()
     end
   }
   _base_0.__index = _base_0
   setmetatable(_base_0, _parent_0.__base)
   local _class_0 = setmetatable({
-    __init = function(self, maxResX, maxResY, resX, resY)
-      _parent_0.__init(self, 'WindowManager', 1, 1, resX, resY)
+    __init = function(self, gctx, w, h)
+      if w == nil then
+        w = 0
+      end
+      if h == nil then
+        h = 0
+      end
+      _parent_0.__init(self, 'WindowManager', 1, 1, w, h)
       self.props.WindowManager = {
-        maxResX = maxResX,
-        maxResY = maxResY,
-        eventHandler = nil
+        gfx = gctx,
+        cmpcntr = 0
       }
-      return self:size(resX, resY)
+      return self:size(w, h)
     end,
     __base = _base_0,
     __name = "WindowManager",
@@ -582,10 +606,10 @@ do
   if _parent_0.__inherited then
     _parent_0.__inherited(_parent_0, _class_0)
   end
-  UI.Components.WindowManager = _class_0
+  SUI.Components.WindowManager = _class_0
 end
 do
-  local _parent_0 = UI.Component
+  local _parent_0 = SUI.Component
   local _base_0 = {
     hasCloseButton = function(self, state)
       if state == nil then
@@ -653,49 +677,54 @@ do
         local bg, fg = self:style().nfbgc, self:style().nffg
         background, bordercolor, titlecolor, textbgcolor, textfgcolor = bg, fg, bg, bg, fg
       end
-      GFX.pushColor(background, bordercolor)
+      SUI.WindowManager:gfx():pushColor(background, bordercolor)
       local x, y, w, h = self.props.x, self.props.y, self.props.w, self.props.h
-      GFX.drawBox(x, y, w, h)
+      SUI.WindowManager:gfx():drawBox(x, y, w, h)
       if self:style().hasborder then
-        GFX.drawBorder(x, y, w, h, self:style().borderchars, false, false)
+        SUI.WindowManager:gfx():drawBorder(x, y, w, h, self:style().borderchars, false, false)
       end
       self:reposition()
-      self:processChildren()
       if self:hasTitleBar() then
-        GFX.pushColor(titlecolor, nil)
-        GFX.drawBox(x, y, w, self:style().titleheight)
+        SUI.WindowManager:gfx():pushColor(titlecolor, nil)
+        SUI.WindowManager:gfx():drawBox(x, y, w, self:style().titleheight)
         if self:style().hasborder then
           local invertTopBottomBorders = false
           if self:style().titleheight <= 1 then
             invertTopBottomBorders = true
           end
-          GFX.pushColor(nil, bordercolor)
-          GFX.drawBorder(x, y, w, self:style().titleheight, self:style().titleborderchars, invertTopBottomBorders)
-          GFX.popColor()
+          SUI.WindowManager:gfx():pushColor(nil, bordercolor)
+          SUI.WindowManager:gfx():drawBorder(x, y, w, self:style().titleheight, self:style().titleborderchars, invertTopBottomBorders)
+          SUI.WindowManager:gfx():popColor()
         end
-        GFX.pushColor(textbgcolor, textfgcolor)
+        SUI.WindowManager:gfx():pushColor(textbgcolor, textfgcolor)
         local textpadding = self:style().textpadding
-        GFX.drawText(self:text(), x + textpadding, y + (math.ceil(self:style().titleheight / 2) - 1), w - textpadding * 2 - (textpadding + 2), math.ceil(self:style().titleheight / 2), self:style().titlevalign, self:style().titlehalign, true, true)
+        SUI.WindowManager:gfx():drawText(self:text(), x + textpadding, y + (math.ceil(self:style().titleheight / 2) - 1), w - textpadding * 2 - (textpadding + 2), math.ceil(self:style().titleheight / 2), self:style().titlevalign, self:style().titlehalign, true, true)
         if self:hasCloseButton() then
-          GFX.plot((self.props.x + self.props.w) - (textpadding + 2), y + (math.ceil(self:style().titleheight / 2) - 1), self:style().closeicon)
+          SUI.WindowManager:gfx():plot((self.props.x + self.props.w) - (textpadding + 2), y + (math.ceil(self:style().titleheight / 2) - 1), self:style().closeicon)
         end
-        GFX.popColor(2)
+        SUI.WindowManager:gfx():popColor(2)
       end
-      return GFX.popColor()
+      SUI.WindowManager:gfx():popColor()
+      return self:processChildren()
     end,
     onEvent = function(self, e)
-      if e[1] == 'touch' or e[1] == 'scroll' then
-        if e[1] == 'touch' and tonumber(e[5]) == 0 and self:hasTitleBar() and self:hasCloseButton() then
+      if e[1] == 'touch' or e[1] == 'scroll' or e[1] == 'monitor_touch' then
+        self.props.epx = tonumber(e[3])
+        self.props.epy = tonumber(e[4])
+        if (e[1] == 'touch' or e[1] == 'monitor_touch') and tonumber(e[5]) == 0 and self:hasTitleBar() and self:hasCloseButton() then
           local textpadding = self:style().textpadding
           local x, y, w, h = (self.props.x + self.props.w) - (textpadding + 2), self.props.y + (math.ceil(self:style().titleheight / 2) - 1), 1, 1
           local mx, my = tonumber(e[3]), tonumber(e[4])
           if mx >= x and mx < x + w and my >= y and my < y + h then
-            GFX.pushColor(self:style().titleclickbg, self:style().titleclickfg)
-            GFX.plot((self.props.x + self.props.w) - (textpadding + 2), self.props.y + (math.ceil(self:style().titleheight / 2) - 1), self:style().closeicon)
-            GFX.popColor()
-            os.sleep(0.3)
-            self:focused(true)
+            SUI.WindowManager:gfx():pushColor(self:style().titleclickbg, self:style().titleclickfg)
+            SUI.WindowManager:gfx():plot((self.props.x + self.props.w) - (textpadding + 2), self.props.y + (math.ceil(self:style().titleheight / 2) - 1), self:style().closeicon)
+            SUI.WindowManager:gfx():popColor()
+            os.sleep(self:style().closedelay)
             self:parent():remove(self)
+            local ce = {
+              'window_closed'
+            }
+            SUI.WindowManager:eventHandler(ce, self)
             return 
           end
         end
@@ -719,24 +748,24 @@ do
   _base_0.__index = _base_0
   setmetatable(_base_0, _parent_0.__base)
   local _class_0 = setmetatable({
-    __init = function(self, hasTitleBar, text, x, y, w, h, hasCloseButton)
-      if hasTitleBar == nil then
-        hasTitleBar = true
-      end
+    __init = function(self, text, x, y, w, h, hasTitleBar, hasCloseButton)
       if text == nil then
         text = ''
       end
       if x == nil then
-        x = 0
+        x = 1
       end
       if y == nil then
-        y = 0
+        y = 1
       end
       if w == nil then
-        w = 0
+        w = 1
       end
       if h == nil then
-        h = 0
+        h = 1
+      end
+      if hasTitleBar == nil then
+        hasTitleBar = true
       end
       if hasCloseButton == nil then
         hasCloseButton = true
@@ -745,7 +774,8 @@ do
       self.props.Window = {
         hasTitleBar = hasTitleBar,
         movable = hasTitleBar,
-        hasCloseButton = hasCloseButton
+        hasCloseButton = hasCloseButton,
+        beignDragged = false
       }
       self.props.focusable = true
     end,
@@ -771,43 +801,10 @@ do
   if _parent_0.__inherited then
     _parent_0.__inherited(_parent_0, _class_0)
   end
-  UI.Components.Window = _class_0
+  SUI.Components.Window = _class_0
 end
 do
-  local _parent_0 = UI.Component
-  local _base_0 = { }
-  _base_0.__index = _base_0
-  setmetatable(_base_0, _parent_0.__base)
-  local _class_0 = setmetatable({
-    __init = function(self, ...)
-      return _parent_0.__init(self, ...)
-    end,
-    __base = _base_0,
-    __name = "Tabview",
-    __parent = _parent_0
-  }, {
-    __index = function(cls, name)
-      local val = rawget(_base_0, name)
-      if val == nil then
-        return _parent_0[name]
-      else
-        return val
-      end
-    end,
-    __call = function(cls, ...)
-      local _self_0 = setmetatable({}, _base_0)
-      cls.__init(_self_0, ...)
-      return _self_0
-    end
-  })
-  _base_0.__class = _class_0
-  if _parent_0.__inherited then
-    _parent_0.__inherited(_parent_0, _class_0)
-  end
-  UI.Components.Tabview = _class_0
-end
-do
-  local _parent_0 = UI.Component
+  local _parent_0 = SUI.Component
   local _base_0 = {
     color = function(self, bg, fg)
       if not (bg and fg) then
@@ -823,12 +820,12 @@ do
       self.props.Box.fillChar = char
     end,
     draw = function(self)
-      GFX.pushColor(self.props.Box.bg, self.props.Box.fg)
-      GFX.drawBox(self.props.x, self.props.y, self.props.w, self.props.h, self:fillChar())
+      SUI.WindowManager:gfx():pushColor(self.props.Box.bg, self.props.Box.fg)
+      SUI.WindowManager:gfx():drawBox(self.props.x, self.props.y, self.props.w, self.props.h, self:fillChar())
       if self:style().hasborder then
-        GFX.drawBorder(self.props.x, self.props.y, self.props.w, self.props.h, self:style().borderchars)
+        SUI.WindowManager:gfx():drawBorder(self.props.x, self.props.y, self.props.w, self.props.h, self:style().borderchars)
       end
-      return GFX.popColor()
+      return SUI.WindowManager:gfx():popColor()
     end
   }
   _base_0.__index = _base_0
@@ -836,16 +833,16 @@ do
   local _class_0 = setmetatable({
     __init = function(self, bg, fg, x, y, w, h, fillChar)
       if x == nil then
-        x = 0
+        x = 1
       end
       if y == nil then
-        y = 0
+        y = 1
       end
       if w == nil then
-        w = 0
+        w = 1
       end
       if h == nil then
-        h = 0
+        h = 1
       end
       if fillChar == nil then
         fillChar = ' '
@@ -879,10 +876,10 @@ do
   if _parent_0.__inherited then
     _parent_0.__inherited(_parent_0, _class_0)
   end
-  UI.Components.Box = _class_0
+  SUI.Components.Box = _class_0
 end
 do
-  local _parent_0 = UI.Component
+  local _parent_0 = SUI.Component
   local _base_0 = {
     align = function(self, valign, halign)
       if valign and halign then
@@ -910,9 +907,9 @@ do
       self.props.Label.clip = state
     end,
     draw = function(self)
-      GFX.pushColor(self:style().background, self:style().textcolor)
-      GFX.drawText(self:text(), self.props.x, self.props.y, self.props.w, self.props.h, self.props.Label.valign, self.props.Label.halign, self.props.Label.wrap, self.props.Label.clip, self:style().background)
-      return GFX.popColor()
+      SUI.WindowManager:gfx():pushColor(self:style().background, self:style().textcolor)
+      SUI.WindowManager:gfx():drawText(self:text(), self.props.x, self.props.y, self.props.w, self.props.h, self.props.Label.valign, self.props.Label.halign, self.props.Label.wrap, self.props.Label.clip, self:style().background)
+      return SUI.WindowManager:gfx():popColor()
     end
   }
   _base_0.__index = _base_0
@@ -976,10 +973,10 @@ do
   if _parent_0.__inherited then
     _parent_0.__inherited(_parent_0, _class_0)
   end
-  UI.Components.Label = _class_0
+  SUI.Components.Label = _class_0
 end
 do
-  local _parent_0 = UI.Component
+  local _parent_0 = SUI.Component
   local _base_0 = {
     draw = function(self)
       local bg, fg = self:style().background, self:style().textcolor
@@ -991,12 +988,12 @@ do
         padding = self:style().textpadding
       end
       local itbb = self.props.h == 1 and true or false
-      GFX.pushColor(bg, fg)
+      SUI.WindowManager:gfx():pushColor(bg, fg)
       if self:style().hasborder then
-        GFX.drawBorder(self.props.x, self.props.y, self.props.w, self.props.h, self:style().borderchars, false, itbb)
+        SUI.WindowManager:gfx():drawBorder(self.props.x, self.props.y, self.props.w, self.props.h, self:style().borderchars, false, itbb)
       end
-      GFX.drawText(self:text(), self.props.x + padding, self.props.y, self.props.w - padding * 2, self.props.h, self:style().textvalign, self:style().texthalign, true, true, self:style().background)
-      return GFX.popColor()
+      SUI.WindowManager:gfx():drawText(self:text(), self.props.x + padding, self.props.y, self.props.w - padding * 2, self.props.h, self:style().textvalign, self:style().texthalign, true, true, self:style().background)
+      return SUI.WindowManager:gfx():popColor()
     end,
     onEvent = function(self, e)
       if e[1] == 'touch' and e[5] == 0 then
@@ -1017,16 +1014,16 @@ do
         text = ''
       end
       if x == nil then
-        x = 0
+        x = 1
       end
       if y == nil then
-        y = 0
+        y = 1
       end
       if w == nil then
-        w = 0
+        w = 1
       end
       if h == nil then
-        h = 0
+        h = 1
       end
       _parent_0.__init(self, 'Button', x, y, w, h, text)
       self.props.Button = {
@@ -1055,10 +1052,10 @@ do
   if _parent_0.__inherited then
     _parent_0.__inherited(_parent_0, _class_0)
   end
-  UI.Components.Button = _class_0
+  SUI.Components.Button = _class_0
 end
 do
-  local _parent_0 = UI.Component
+  local _parent_0 = SUI.Component
   local _base_0 = {
     active = function(self, state)
       if state == nil then
@@ -1079,12 +1076,12 @@ do
         padding = self:style().textpadding
       end
       local itbb = self.props.h == 1 and true or false
-      GFX.pushColor(bg, fg)
+      SUI.WindowManager:gfx():pushColor(bg, fg)
       if self:style().hasborder then
-        GFX.drawBorder(self.props.x, self.props.y, self.props.w, self.props.h, self:style().borderchars, false, itbb)
+        SUI.WindowManager:gfx():drawBorder(self.props.x, self.props.y, self.props.w, self.props.h, self:style().borderchars, false, itbb)
       end
-      GFX.drawText(self:text(), self.props.x + padding, self.props.y, self.props.w - padding * 2, self.props.h, self:style().textvalign, self:style().texthalign, true, true, self:style().background)
-      return GFX.popColor()
+      SUI.WindowManager:gfx():drawText(self:text(), self.props.x + padding, self.props.y, self.props.w - padding * 2, self.props.h, self:style().textvalign, self:style().texthalign, true, true, self:style().background)
+      return SUI.WindowManager:gfx():popColor()
     end,
     onEvent = function(self, e)
       if e[1] == 'touch' and e[5] == 0 then
@@ -1106,16 +1103,16 @@ do
         text = ''
       end
       if x == nil then
-        x = 0
+        x = 1
       end
       if y == nil then
-        y = 0
+        y = 1
       end
       if w == nil then
-        w = 0
+        w = 1
       end
       if h == nil then
-        h = 0
+        h = 1
       end
       _parent_0.__init(self, 'Toggle', x, y, w, h, text)
       self.props.Toggle = {
@@ -1145,175 +1142,10 @@ do
   if _parent_0.__inherited then
     _parent_0.__inherited(_parent_0, _class_0)
   end
-  UI.Components.Toggle = _class_0
+  SUI.Components.Toggle = _class_0
 end
 do
-  local _parent_0 = UI.Component
-  local _base_0 = { }
-  _base_0.__index = _base_0
-  setmetatable(_base_0, _parent_0.__base)
-  local _class_0 = setmetatable({
-    __init = function(self, ...)
-      return _parent_0.__init(self, ...)
-    end,
-    __base = _base_0,
-    __name = "List",
-    __parent = _parent_0
-  }, {
-    __index = function(cls, name)
-      local val = rawget(_base_0, name)
-      if val == nil then
-        return _parent_0[name]
-      else
-        return val
-      end
-    end,
-    __call = function(cls, ...)
-      local _self_0 = setmetatable({}, _base_0)
-      cls.__init(_self_0, ...)
-      return _self_0
-    end
-  })
-  _base_0.__class = _class_0
-  if _parent_0.__inherited then
-    _parent_0.__inherited(_parent_0, _class_0)
-  end
-  UI.Components.List = _class_0
-end
-do
-  local _parent_0 = UI.Component
-  local _base_0 = { }
-  _base_0.__index = _base_0
-  setmetatable(_base_0, _parent_0.__base)
-  local _class_0 = setmetatable({
-    __init = function(self, ...)
-      return _parent_0.__init(self, ...)
-    end,
-    __base = _base_0,
-    __name = "Spinner",
-    __parent = _parent_0
-  }, {
-    __index = function(cls, name)
-      local val = rawget(_base_0, name)
-      if val == nil then
-        return _parent_0[name]
-      else
-        return val
-      end
-    end,
-    __call = function(cls, ...)
-      local _self_0 = setmetatable({}, _base_0)
-      cls.__init(_self_0, ...)
-      return _self_0
-    end
-  })
-  _base_0.__class = _class_0
-  if _parent_0.__inherited then
-    _parent_0.__inherited(_parent_0, _class_0)
-  end
-  UI.Components.Spinner = _class_0
-end
-do
-  local _parent_0 = UI.Component
-  local _base_0 = { }
-  _base_0.__index = _base_0
-  setmetatable(_base_0, _parent_0.__base)
-  local _class_0 = setmetatable({
-    __init = function(self, ...)
-      return _parent_0.__init(self, ...)
-    end,
-    __base = _base_0,
-    __name = "Checkbox",
-    __parent = _parent_0
-  }, {
-    __index = function(cls, name)
-      local val = rawget(_base_0, name)
-      if val == nil then
-        return _parent_0[name]
-      else
-        return val
-      end
-    end,
-    __call = function(cls, ...)
-      local _self_0 = setmetatable({}, _base_0)
-      cls.__init(_self_0, ...)
-      return _self_0
-    end
-  })
-  _base_0.__class = _class_0
-  if _parent_0.__inherited then
-    _parent_0.__inherited(_parent_0, _class_0)
-  end
-  UI.Components.Checkbox = _class_0
-end
-do
-  local _parent_0 = UI.Component
-  local _base_0 = { }
-  _base_0.__index = _base_0
-  setmetatable(_base_0, _parent_0.__base)
-  local _class_0 = setmetatable({
-    __init = function(self, ...)
-      return _parent_0.__init(self, ...)
-    end,
-    __base = _base_0,
-    __name = "Radiobox",
-    __parent = _parent_0
-  }, {
-    __index = function(cls, name)
-      local val = rawget(_base_0, name)
-      if val == nil then
-        return _parent_0[name]
-      else
-        return val
-      end
-    end,
-    __call = function(cls, ...)
-      local _self_0 = setmetatable({}, _base_0)
-      cls.__init(_self_0, ...)
-      return _self_0
-    end
-  })
-  _base_0.__class = _class_0
-  if _parent_0.__inherited then
-    _parent_0.__inherited(_parent_0, _class_0)
-  end
-  UI.Components.Radiobox = _class_0
-end
-do
-  local _parent_0 = UI.Component
-  local _base_0 = { }
-  _base_0.__index = _base_0
-  setmetatable(_base_0, _parent_0.__base)
-  local _class_0 = setmetatable({
-    __init = function(self, ...)
-      return _parent_0.__init(self, ...)
-    end,
-    __base = _base_0,
-    __name = "Editbox",
-    __parent = _parent_0
-  }, {
-    __index = function(cls, name)
-      local val = rawget(_base_0, name)
-      if val == nil then
-        return _parent_0[name]
-      else
-        return val
-      end
-    end,
-    __call = function(cls, ...)
-      local _self_0 = setmetatable({}, _base_0)
-      cls.__init(_self_0, ...)
-      return _self_0
-    end
-  })
-  _base_0.__class = _class_0
-  if _parent_0.__inherited then
-    _parent_0.__inherited(_parent_0, _class_0)
-  end
-  UI.Components.Editbox = _class_0
-end
-do
-  local _parent_0 = UI.Component
+  local _parent_0 = SUI.Component
   local _base_0 = {
     direction = function(self, direction)
       if not (direction) then
@@ -1348,9 +1180,9 @@ do
       self.props.Progress.current = progress
     end,
     draw = function(self)
-      GFX.pushColor(self:style().background, self:style().textcolor)
-      GFX.drawBox(self.props.x, self.props.y, self.props.w, self.props.h, self:style().emptychar)
-      GFX.pushColor(self:style().prgbackground, self:style().prgtextcolor)
+      SUI.WindowManager:gfx():pushColor(self:style().background, self:style().textcolor)
+      SUI.WindowManager:gfx():drawBox(self.props.x, self.props.y, self.props.w, self.props.h, self:style().emptychar)
+      SUI.WindowManager:gfx():pushColor(self:style().prgbackground, self:style().prgtextcolor)
       local sx, sy, sw, sh = self.props.x, self.props.y, self.props.w, self.props.h
       if self:style().hasborder then
         sx = sx + 1
@@ -1360,16 +1192,16 @@ do
       end
       if self:progress() > 0 then
         if self:direction() == 'hor' then
-          GFX.drawBox(sx, sy, math.floor(sw * self:progress()), sh, self:style().prgchar)
+          SUI.WindowManager:gfx():drawBox(sx, sy, math.floor(sw * self:progress()), sh, self:style().prgchar)
         else
           local progress = math.floor(sh * self:progress())
-          GFX.drawBox(sx, (sy + (sh - progress)), sw, progress, self:style().prgchar)
+          SUI.WindowManager:gfx():drawBox(sx, (sy + (sh - progress)), sw, progress, self:style().prgchar)
         end
       end
       if self:style().hasborder then
-        GFX.drawBorder(self.props.x, self.props.y, self.props.w, self.props.h, self:style().borderchars)
+        SUI.WindowManager:gfx():drawBorder(self.props.x, self.props.y, self.props.w, self.props.h, self:style().borderchars)
       end
-      return GFX.popColor(2)
+      return SUI.WindowManager:gfx():popColor(2)
     end
   }
   _base_0.__index = _base_0
@@ -1377,16 +1209,16 @@ do
   local _class_0 = setmetatable({
     __init = function(self, x, y, w, h, direction)
       if x == nil then
-        x = 0
+        x = 1
       end
       if y == nil then
-        y = 0
+        y = 1
       end
       if w == nil then
-        w = 0
+        w = 1
       end
       if h == nil then
-        h = 0
+        h = 1
       end
       if direction == nil then
         direction = 'hor'
@@ -1420,29 +1252,344 @@ do
   if _parent_0.__inherited then
     _parent_0.__inherited(_parent_0, _class_0)
   end
-  UI.Components.Progress = _class_0
+  SUI.Components.Progress = _class_0
 end
-UI.init = function(resX, resY)
-  local mrx, mry = ocgpu.maxResolution()
-  local crx, cry = ocgpu.getResolution()
-  if not (resX) then
-    resX = crx
+do
+  local _parent_0 = SUI.Component
+  local _base_0 = { }
+  _base_0.__index = _base_0
+  setmetatable(_base_0, _parent_0.__base)
+  local _class_0 = setmetatable({
+    __init = function(self, ...)
+      return _parent_0.__init(self, ...)
+    end,
+    __base = _base_0,
+    __name = "Tabs",
+    __parent = _parent_0
+  }, {
+    __index = function(cls, name)
+      local val = rawget(_base_0, name)
+      if val == nil then
+        return _parent_0[name]
+      else
+        return val
+      end
+    end,
+    __call = function(cls, ...)
+      local _self_0 = setmetatable({}, _base_0)
+      cls.__init(_self_0, ...)
+      return _self_0
+    end
+  })
+  _base_0.__class = _class_0
+  if _parent_0.__inherited then
+    _parent_0.__inherited(_parent_0, _class_0)
   end
-  if not (resY) then
-    resY = cry
-  end
-  if resX < 1 or resX > mrx then
-    resX = mrx
-  end
-  if resY < 1 or resY > mry then
-    resY = mry
-  end
-  GFX.firstColor(GFX.Colors.Black, GFX.Colors.White)
-  UI.DefaultStyle = UI.Style('default')
-  UI.WindowManager = UI.Components.WindowManager(mrx, mry, resX, resY)
-  return UI.WindowManager
+  SUI.Components.Tabs = _class_0
 end
-return {
-  UI = UI,
-  GFX = GFX
-}
+do
+  local _parent_0 = SUI.Component
+  local _base_0 = { }
+  _base_0.__index = _base_0
+  setmetatable(_base_0, _parent_0.__base)
+  local _class_0 = setmetatable({
+    __init = function(self, ...)
+      return _parent_0.__init(self, ...)
+    end,
+    __base = _base_0,
+    __name = "Panel",
+    __parent = _parent_0
+  }, {
+    __index = function(cls, name)
+      local val = rawget(_base_0, name)
+      if val == nil then
+        return _parent_0[name]
+      else
+        return val
+      end
+    end,
+    __call = function(cls, ...)
+      local _self_0 = setmetatable({}, _base_0)
+      cls.__init(_self_0, ...)
+      return _self_0
+    end
+  })
+  _base_0.__class = _class_0
+  if _parent_0.__inherited then
+    _parent_0.__inherited(_parent_0, _class_0)
+  end
+  SUI.Components.Panel = _class_0
+end
+do
+  local _parent_0 = SUI.Component
+  local _base_0 = { }
+  _base_0.__index = _base_0
+  setmetatable(_base_0, _parent_0.__base)
+  local _class_0 = setmetatable({
+    __init = function(self, ...)
+      return _parent_0.__init(self, ...)
+    end,
+    __base = _base_0,
+    __name = "Modal",
+    __parent = _parent_0
+  }, {
+    __index = function(cls, name)
+      local val = rawget(_base_0, name)
+      if val == nil then
+        return _parent_0[name]
+      else
+        return val
+      end
+    end,
+    __call = function(cls, ...)
+      local _self_0 = setmetatable({}, _base_0)
+      cls.__init(_self_0, ...)
+      return _self_0
+    end
+  })
+  _base_0.__class = _class_0
+  if _parent_0.__inherited then
+    _parent_0.__inherited(_parent_0, _class_0)
+  end
+  SUI.Components.Modal = _class_0
+end
+do
+  local _parent_0 = SUI.Component
+  local _base_0 = { }
+  _base_0.__index = _base_0
+  setmetatable(_base_0, _parent_0.__base)
+  local _class_0 = setmetatable({
+    __init = function(self, ...)
+      return _parent_0.__init(self, ...)
+    end,
+    __base = _base_0,
+    __name = "Layout",
+    __parent = _parent_0
+  }, {
+    __index = function(cls, name)
+      local val = rawget(_base_0, name)
+      if val == nil then
+        return _parent_0[name]
+      else
+        return val
+      end
+    end,
+    __call = function(cls, ...)
+      local _self_0 = setmetatable({}, _base_0)
+      cls.__init(_self_0, ...)
+      return _self_0
+    end
+  })
+  _base_0.__class = _class_0
+  if _parent_0.__inherited then
+    _parent_0.__inherited(_parent_0, _class_0)
+  end
+  SUI.Components.Layout = _class_0
+end
+do
+  local _parent_0 = SUI.Component
+  local _base_0 = { }
+  _base_0.__index = _base_0
+  setmetatable(_base_0, _parent_0.__base)
+  local _class_0 = setmetatable({
+    __init = function(self, ...)
+      return _parent_0.__init(self, ...)
+    end,
+    __base = _base_0,
+    __name = "Scroller",
+    __parent = _parent_0
+  }, {
+    __index = function(cls, name)
+      local val = rawget(_base_0, name)
+      if val == nil then
+        return _parent_0[name]
+      else
+        return val
+      end
+    end,
+    __call = function(cls, ...)
+      local _self_0 = setmetatable({}, _base_0)
+      cls.__init(_self_0, ...)
+      return _self_0
+    end
+  })
+  _base_0.__class = _class_0
+  if _parent_0.__inherited then
+    _parent_0.__inherited(_parent_0, _class_0)
+  end
+  SUI.Components.Scroller = _class_0
+end
+do
+  local _parent_0 = SUI.Component
+  local _base_0 = { }
+  _base_0.__index = _base_0
+  setmetatable(_base_0, _parent_0.__base)
+  local _class_0 = setmetatable({
+    __init = function(self, ...)
+      return _parent_0.__init(self, ...)
+    end,
+    __base = _base_0,
+    __name = "List",
+    __parent = _parent_0
+  }, {
+    __index = function(cls, name)
+      local val = rawget(_base_0, name)
+      if val == nil then
+        return _parent_0[name]
+      else
+        return val
+      end
+    end,
+    __call = function(cls, ...)
+      local _self_0 = setmetatable({}, _base_0)
+      cls.__init(_self_0, ...)
+      return _self_0
+    end
+  })
+  _base_0.__class = _class_0
+  if _parent_0.__inherited then
+    _parent_0.__inherited(_parent_0, _class_0)
+  end
+  SUI.Components.List = _class_0
+end
+do
+  local _parent_0 = SUI.Component
+  local _base_0 = { }
+  _base_0.__index = _base_0
+  setmetatable(_base_0, _parent_0.__base)
+  local _class_0 = setmetatable({
+    __init = function(self, ...)
+      return _parent_0.__init(self, ...)
+    end,
+    __base = _base_0,
+    __name = "Spinner",
+    __parent = _parent_0
+  }, {
+    __index = function(cls, name)
+      local val = rawget(_base_0, name)
+      if val == nil then
+        return _parent_0[name]
+      else
+        return val
+      end
+    end,
+    __call = function(cls, ...)
+      local _self_0 = setmetatable({}, _base_0)
+      cls.__init(_self_0, ...)
+      return _self_0
+    end
+  })
+  _base_0.__class = _class_0
+  if _parent_0.__inherited then
+    _parent_0.__inherited(_parent_0, _class_0)
+  end
+  SUI.Components.Spinner = _class_0
+end
+do
+  local _parent_0 = SUI.Component
+  local _base_0 = { }
+  _base_0.__index = _base_0
+  setmetatable(_base_0, _parent_0.__base)
+  local _class_0 = setmetatable({
+    __init = function(self, ...)
+      return _parent_0.__init(self, ...)
+    end,
+    __base = _base_0,
+    __name = "Checkbox",
+    __parent = _parent_0
+  }, {
+    __index = function(cls, name)
+      local val = rawget(_base_0, name)
+      if val == nil then
+        return _parent_0[name]
+      else
+        return val
+      end
+    end,
+    __call = function(cls, ...)
+      local _self_0 = setmetatable({}, _base_0)
+      cls.__init(_self_0, ...)
+      return _self_0
+    end
+  })
+  _base_0.__class = _class_0
+  if _parent_0.__inherited then
+    _parent_0.__inherited(_parent_0, _class_0)
+  end
+  SUI.Components.Checkbox = _class_0
+end
+do
+  local _parent_0 = SUI.Component
+  local _base_0 = { }
+  _base_0.__index = _base_0
+  setmetatable(_base_0, _parent_0.__base)
+  local _class_0 = setmetatable({
+    __init = function(self, ...)
+      return _parent_0.__init(self, ...)
+    end,
+    __base = _base_0,
+    __name = "Radiobox",
+    __parent = _parent_0
+  }, {
+    __index = function(cls, name)
+      local val = rawget(_base_0, name)
+      if val == nil then
+        return _parent_0[name]
+      else
+        return val
+      end
+    end,
+    __call = function(cls, ...)
+      local _self_0 = setmetatable({}, _base_0)
+      cls.__init(_self_0, ...)
+      return _self_0
+    end
+  })
+  _base_0.__class = _class_0
+  if _parent_0.__inherited then
+    _parent_0.__inherited(_parent_0, _class_0)
+  end
+  SUI.Components.Radiobox = _class_0
+end
+do
+  local _parent_0 = SUI.Component
+  local _base_0 = { }
+  _base_0.__index = _base_0
+  setmetatable(_base_0, _parent_0.__base)
+  local _class_0 = setmetatable({
+    __init = function(self, ...)
+      return _parent_0.__init(self, ...)
+    end,
+    __base = _base_0,
+    __name = "Editbox",
+    __parent = _parent_0
+  }, {
+    __index = function(cls, name)
+      local val = rawget(_base_0, name)
+      if val == nil then
+        return _parent_0[name]
+      else
+        return val
+      end
+    end,
+    __call = function(cls, ...)
+      local _self_0 = setmetatable({}, _base_0)
+      cls.__init(_self_0, ...)
+      return _self_0
+    end
+  })
+  _base_0.__class = _class_0
+  if _parent_0.__inherited then
+    _parent_0.__inherited(_parent_0, _class_0)
+  end
+  SUI.Components.Editbox = _class_0
+end
+SUI.init = function(gctx)
+  if gctx then
+    SUI.DefaultStyle = SUI.Style('default')
+    SUI.WindowManager = SUI.Components.WindowManager(gctx)
+    return SUI.WindowManager
+  end
+  return nil
+end
+return SUI
