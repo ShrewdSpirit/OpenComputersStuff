@@ -1,15 +1,17 @@
 # OpenComputersStuff
 My apps 'n libs for Minecraft OpenComputers mod
 
-Most of the scripts are written in [moonscript](http://moonscript.org) thus generated lua code might be huge and you need higher memory or maybe higher callBudgets!
+Most of the scripts are written in [moonscript](http://moonscript.org) thus some generated lua code might be huge and you need higher memory or maybe higher callBudgets!
+
+Scripts with .moon extension are [moonscript](http://moonscript.org) files and you can find the docs of such files in the moonscript files instead of their compiled lua script.
 
 ----
-libsui: An OO GUI library (I've broke it! So don't use it yet!)
+libsui.lua: An Object Oriented GUI library (under development)
 
-suitest: test script for shrewdui
+suitest.lua: Test script for shrewdui.
 
-libsgfx: An OO graphics library which lets you use monitors/screens easier (drawing and stuff!)
+libsgfx.lua: An Object Oriented graphics library which lets you use monitors/screens easier. You can do drawings much easier.
 
-sgfxtest: test script for libsgfx
+sgfxtest.lua: Test script for libsgfx.
 
 json: Jeffrey Friedl's json library http://regex.info/blog/lua/json

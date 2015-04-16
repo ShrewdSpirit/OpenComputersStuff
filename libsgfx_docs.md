@@ -19,8 +19,8 @@ Functions:
 - plot: `(x: number, y: number, char: number|string)` plots a character (string or unicode code!) at given position
 - set: `(x: number, y: number, str: string|number, vertical: boolean)` writes a string at given position (or a single character/unicode)
 - fill: `(x: number, y: number, w: number, h: number, char: number|string)` fills a rectangle with given coordinates
-- flush: `(stat: table)`
-    flushes the displays informations. this should be called when a gpu,screen or monitor has been removed, added or resized. stat is the event (run dmesg and try adding or removing screens,monitors). if stat is nil, driver will be reinitialized
+- refresh: `(stat: table)`
+    refreshes the displays informations. this should be called when a gpu,screen or monitor has been removed, added or resized. stat is the event (run dmesg and try adding or removing screens,monitors). if stat is nil, driver will be reinitialized
 - checkComponentAvailability: `()` checks if theres a gpu and an active display
 
 Context class
@@ -45,21 +45,7 @@ Functions:
 
 Colors table
 -----
-This is a table of 16 predefined colors. Because monitors doesn't support hex values, there are two color tables with two different aliases:
-- MColors `monitor supported colors`
-- SColors `screen supported colors`
-
-Aliases:
-- MColors:
-    - Colors.m
-    - Colors['m']
-    - Colors.monitor
-    - Colors['monitor']
-- SColors:
-    - Colors.s
-    - Colors['s']
-    - Colors.screen
-    - Colors['screen']
+This is a table of 16 predefined colors. Because monitors doesn't support hex colors, you should use GFX.Util.mapToMonitorColor to convert the color for the monitor.
 
 Available colors:
 - Black
